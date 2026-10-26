@@ -3195,57 +3195,23 @@ local function Main()
 				mode = "V1",
 				delay = 1.65,
 				jump = 60,
-				accuracy = -12,
+				accuracy = 12,
 				cancelDelay = 0.4,
 				cancelEnabled = true,
-				noclip = false,
+				noclip = true,
 				range = 10,
 			},
 			{
-				name = "Oreo",
-				kind = "oreo",
-				anim = "rbxassetid://10503381238",
-				enabled = false,
-				delay = 0.3,
-				jump = 50,
-				flick = 0.2,
-				endDelay = 0.15,
-				autoPos = false,
-				accuracy = 0,
-				cancelDelay = 0,
-				cancelEnabled = false,
-				range = 6,
-				cancelSwitch = false,
-				accuracyBox = false,
-				jumpBox = false,
-				flickBox = true,
-				endBox = true,
-				autoPosToggle = true,
-			},
-			{
 				name = "King",
-				kind = "king",
-				anim = "rbxassetid://10503381238",
-				enabled = false,
-				delay = 0.3,
-				jump = 0,
-				flick = 0.2,
-				accuracy = 0,
-				cancelDelay = 0,
-				cancelEnabled = false,
-				range = 6,
-				cancelSwitch = false,
-				accuracyBox = false,
-				jumpBox = false,
-				flickBox = true,
+				kind = "flux",
 			},
 			{
 				name = "Supa",
 				anim = "rbxassetid://10503381238",
 				enabled = false,
 				delay = 0.299,
-				jump = 36.89,
-				accuracy = -0,
+				jump = 36.99,
+				accuracy = 0,
 				cancelDelay = 0,
 				cancelEnabled = true,
 				range = 8.3,
@@ -3430,204 +3396,6 @@ local function Main()
 
 		local LOCK_ANIM = "10479335397"
 		local techLockUntil = 0
-		local techBusy = {}
-		local nearHighlight = nil
-		local cameraLockConn = nil
-		local stickConn = nil
-		local stickToken = 0
-		local kingTweening = false
-
-		local function nearestPlayer()
-			local character = LocalPlayer.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if not root then return nil, nil end
-			local bestChar, bestRoot, bestDistance = nil, nil, math.huge
-			for _, player in ipairs(Players:GetPlayers()) do
-				if player ~= LocalPlayer then
-					local otherChar = player.Character
-					local otherRoot = otherChar and otherChar:FindFirstChild("HumanoidRootPart")
-					local otherHum = otherChar and otherChar:FindFirstChildOfClass("Humanoid")
-					if otherRoot and otherHum and otherHum.Health > 0 then
-						local distance = (otherRoot.Position - root.Position).Magnitude
-						if distance < bestDistance then
-							bestChar, bestRoot, bestDistance = otherChar, otherRoot, distance
-						end
-					end
-				end
-			end
-			return bestChar, bestRoot
-		end
-
-		local function nearestLiveHead()
-			local character = LocalPlayer.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if not root then return nil end
-			local live = workspace:FindFirstChild("Live")
-			local models
-			if live then
-				models = live:GetChildren()
-			else
-				models = {}
-				for _, player in ipairs(Players:GetPlayers()) do
-					if player.Character then
-						table.insert(models, player.Character)
-					end
-				end
-			end
-			local best, bestDistance = nil, math.huge
-			for _, model in ipairs(models) do
-				if model ~= character then
-					local head = model:FindFirstChild("Head")
-					local hum = model:FindFirstChildOfClass("Humanoid")
-					if head and hum and hum.Health > 0 then
-						local distance = (head.Position - root.Position).Magnitude
-						if distance < bestDistance then
-							best, bestDistance = head, distance
-						end
-					end
-				end
-			end
-			return best
-		end
-
-		local function setHighlight(character)
-			if nearHighlight then
-				pcall(function()
-					nearHighlight:Destroy()
-				end)
-				nearHighlight = nil
-			end
-			if character then
-				local ok, highlight = pcall(function()
-					local h = Instance.new("Highlight")
-					h.Name = "NearestPlayerHighlight"
-					h.FillColor = Color3.fromRGB(0, 255, 255)
-					h.OutlineColor = Color3.fromRGB(255, 255, 255)
-					h.FillTransparency = 0.5
-					h.OutlineTransparency = 0
-					h.Adornee = character
-					h.Parent = workspace
-					return h
-				end)
-				if ok then
-					nearHighlight = highlight
-				end
-			end
-		end
-
-		local function jumpUp(power)
-			local character = LocalPlayer.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			if not root then return end
-			local v = root.AssemblyLinearVelocity
-			root.AssemblyLinearVelocity = Vector3.new(v.X, power, v.Z)
-		end
-
-		local function climbToTarget()
-			local character = LocalPlayer.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local _, targetRoot = nearestPlayer()
-			if not root or not targetRoot then return end
-			local rise = targetRoot.Position.Y + 1 - root.Position.Y
-			if rise <= 0 then return end
-			local v = root.AssemblyLinearVelocity
-			root.AssemblyLinearVelocity = Vector3.new(v.X, math.sqrt(2 * workspace.Gravity * rise), v.Z)
-		end
-
-		local function flipCamera()
-			local camera = workspace.CurrentCamera
-			if not camera then return end
-			local cf = camera.CFrame
-			local look = cf.LookVector
-			local flat = Vector3.new(look.X, 0, look.Z)
-			if flat.Magnitude < 0.001 then return end
-			local back = -flat.Unit
-			local c = math.cos(math.asin(math.clamp(look.Y, -1, 1)))
-			camera.CFrame = CFrame.lookAt(cf.Position, cf.Position + Vector3.new(back.X * c, look.Y, back.Z * c), Vector3.yAxis)
-		end
-
-		local function setCameraLock(on)
-			if cameraLockConn then
-				cameraLockConn:Disconnect()
-				cameraLockConn = nil
-			end
-			if on then
-				cameraLockConn = RunService.RenderStepped:Connect(function()
-					local camera = workspace.CurrentCamera
-					local _, targetRoot = nearestPlayer()
-					if not camera or not targetRoot then return end
-					camera.CFrame = CFrame.lookAt(camera.CFrame.Position, targetRoot.Position)
-				end)
-			end
-		end
-
-		local function stickBehindTarget(seconds)
-			stickToken = stickToken + 1
-			local myToken = stickToken
-			if stickConn then
-				stickConn:Disconnect()
-				stickConn = nil
-			end
-			stickConn = RunService.RenderStepped:Connect(function()
-				if stickToken ~= myToken then return end
-				local character = LocalPlayer.Character
-				local root = character and character:FindFirstChild("HumanoidRootPart")
-				local _, targetRoot = nearestPlayer()
-				local camera = workspace.CurrentCamera
-				if not root or not targetRoot or not camera then return end
-				local look = camera.CFrame.LookVector
-				local facing = CFrame.Angles(0, math.atan2(-look.X, -look.Z), 0)
-				root.CFrame = CFrame.new(targetRoot.Position + facing.LookVector * -1) * facing * CFrame.Angles(math.rad(20), 0, 0)
-			end)
-			task.delay(math.max(0, seconds), function()
-				if stickToken == myToken and stickConn then
-					stickConn:Disconnect()
-					stickConn = nil
-				end
-			end)
-		end
-
-		local function autoPosition()
-			local character = LocalPlayer.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local _, targetRoot = nearestPlayer()
-			if not root or not targetRoot then return end
-			local p = targetRoot.Position + -root.CFrame.LookVector * 5
-			root.CFrame = CFrame.new(p.X, root.Position.Y, p.Z)
-		end
-
-		local function kingTween()
-			if kingTweening then return end
-			local character = LocalPlayer.Character
-			local root = character and character:FindFirstChild("HumanoidRootPart")
-			local head = nearestLiveHead()
-			if not root or not head then return end
-			kingTweening = true
-			pcall(function()
-				local tween = TweenService:Create(root, TweenInfo.new(0.2, ES.Quad, ED.Out), {
-					CFrame = CFrame.new(head.Position + Vector3.new(0, 3, 0)),
-				})
-				tween:Play()
-				tween.Completed:Wait()
-				local total = 0
-				while total < 0.1 do
-					total = total + RunService.Heartbeat:Wait()
-					if not alive or not root.Parent or not head.Parent then break end
-					root.AssemblyLinearVelocity = Vector3.zero
-					root.CFrame = CFrame.new(head.Position + Vector3.new(0, 3, 0))
-				end
-			end)
-			kingTweening = false
-		end
-
-		local function runGuarded(tech, steps)
-			if not alive or not tech.enabled or techBusy[tech.kind] or os.clock() < techLockUntil then return end
-			techBusy[tech.kind] = true
-			pcall(steps)
-			pcall(setCameraLock, false)
-			pcall(setHighlight, nil)
-			techBusy[tech.kind] = false
-		end
 
 		-- ===== Noclip lokal (hanya karakter sendiri) =====
 		local Stats = svc("Stats")
@@ -3966,42 +3734,675 @@ local function Main()
 			end,
 		})
 
-		local function activateOreo(tech)
-			runGuarded(tech, function()
-				if tech.autoPos then
-					autoPosition()
+		-- ===== King (Flux loader, butuh key) =====
+		local fluxExecuted = false
+		local fluxRunning = false
+
+		local function runFluxLoader()
+			local ENDPOINT = "https://flux-gate.priyanshusahran61.workers.dev/"
+			local LOADER_VERSION = "1.0.0"
+			local SCRIPT_ID = "flux-k1ng-tech"
+			local SCRIPT_NAME = "flux k1ng tech"
+
+			local Players = game:GetService("Players")
+			local HttpService = game:GetService("HttpService")
+
+			local LocalPlayer = Players.LocalPlayer
+			if not LocalPlayer then
+				warn("[Flux] Loader: run this on the client.")
+				return
+			end
+
+			local function getEnvironment()
+				local ok, environment = pcall(getgenv)
+				if ok and type(environment) == "table" then
+					return environment
 				end
-				task.wait(math.max(0, tech.delay))
-				if not alive or not tech.enabled then return end
-				setHighlight((nearestPlayer()))
-				jumpUp(tech.jump)
-				sendDashInput()
-				task.wait(math.max(0, tech.flick))
-				if not alive then return end
-				setCameraLock(true)
-				climbToTarget()
-				task.wait(math.max(0, tech.endDelay))
-				setCameraLock(false)
-				stickBehindTarget(0.2)
+				return _G
+			end
+
+			local function getSavedKey()
+				local value = getEnvironment().FluxKey
+				return type(value) == "string" and value:gsub("%s+", "") or ""
+			end
+
+			local function saveKey(key)
+				getEnvironment().FluxKey = key
+			end
+
+			local requestFunction = (type(syn) == "table" and type(syn.request) == "function" and syn.request)
+				or (type(http) == "table" and type(http.request) == "function" and http.request)
+				or (type(fluxus) == "table" and type(fluxus.request) == "function" and fluxus.request)
+				or (type(request) == "function" and request)
+				or (type(http_request) == "function" and http_request)
+
+			if not requestFunction then
+				warn("[Flux] Loader: this executor does not expose an HTTP request function.")
+				return
+			end
+
+			local function getHwid()
+				if type(hwid) == "string" and hwid ~= "" then
+					return hwid
+				end
+				local getters = {}
+				if type(gethwid) == "function" then
+					table.insert(getters, gethwid)
+				end
+				if type(syn) == "table" and type(syn.get_hwid) == "function" then
+					table.insert(getters, syn.get_hwid)
+				end
+				if type(fluxus) == "table" and type(fluxus.get_hwid) == "function" then
+					table.insert(getters, fluxus.get_hwid)
+				end
+				if type(get_hwid) == "function" then
+					table.insert(getters, get_hwid)
+				end
+				if type(hwid) == "function" then
+					table.insert(getters, hwid)
+				end
+				for _, getter in ipairs(getters) do
+					local ok, value = pcall(getter)
+					if ok and value ~= nil then
+						local text = tostring(value)
+						if text ~= "" then
+							return text
+						end
+					end
+				end
+				return "uid:" .. tostring(LocalPlayer.UserId)
+			end
+
+			local HWID = getHwid()
+			local BASE_URL = tostring(ENDPOINT):gsub("/+$", "")
+
+			if BASE_URL:find("YOUR-WORKER", 1, true) ~= nil or BASE_URL:sub(1, 8) ~= "https://" then
+				warn("[Flux] Loader: set ENDPOINT to your deployed HTTPS Worker URL.")
+				return
+			end
+
+			local function callApi(path, method, body, headers)
+				local options = {
+					Url = BASE_URL .. path,
+					Method = method,
+					Headers = headers or {},
+				}
+				if body ~= nil then
+					options.Body = body
+				end
+				local ok, response = pcall(requestFunction, options)
+				if not ok or type(response) ~= "table" then
+					return nil, 0
+				end
+				return response.Body or "", tonumber(response.StatusCode) or 0
+			end
+
+			local function decodeError(body)
+				local ok, data = pcall(HttpService.JSONDecode, HttpService, body or "")
+				if ok and type(data) == "table" and type(data.error) == "string" then
+					return data.error
+				end
+				return nil
+			end
+
+			local ERROR_TEXT = {
+				KEY_REQUIRED = "KEY REQUIRED",
+				INVALID_KEY = "INVALID KEY",
+				HWID_REQUIRED = "DEVICE ID UNAVAILABLE",
+				HWID_MISMATCH = "LOCKED TO ANOTHER DEVICE",
+				EXPIRED = "KEY EXPIRED",
+				KEY_REVOKED = "KEY REVOKED",
+				TOKEN_INVALID = "SESSION EXPIRED",
+				RATE_LIMITED = "SLOW DOWN / TRY AGAIN",
+				DAILY_LIMIT = "DAILY LIMIT REACHED",
+				SERVICE_PAUSED = "SERVICE PAUSED",
+				NO_PAYLOAD = "PAYLOAD UNAVAILABLE",
+				SCRIPT_NOT_FOUND = "SCRIPT UNAVAILABLE",
+				CODE_TOO_LARGE = "PAYLOAD TOO LARGE",
+				SERVER_MISCONFIGURED = "SERVER SETUP ERROR",
+				SERVER_ERROR = "SERVER ERROR",
+				BAD_REQUEST = "BAD REQUEST",
+			}
+
+			local function friendlyError(code, body)
+				local apiError = decodeError(body)
+				if apiError and ERROR_TEXT[apiError] then
+					return ERROR_TEXT[apiError]
+				end
+				if code == 0 then
+					return "CONNECT FAILED"
+				end
+				if code == 401 then
+					return "KEY REQUIRED"
+				end
+				if code == 403 then
+					return "ACCESS DENIED"
+				end
+				if code == 429 then
+					return "RATE LIMITED"
+				end
+				if code == 503 then
+					return "SERVICE UNAVAILABLE"
+				end
+				return "REQUEST FAILED (" .. tostring(code) .. ")"
+			end
+
+			local function authenticate(key)
+				local encoded = HttpService:JSONEncode({
+					key = key,
+					hwid = HWID,
+					userId = LocalPlayer.UserId,
+					placeId = game.PlaceId,
+					script = SCRIPT_ID,
+				})
+				local body, code = callApi("/v1/auth", "POST", encoded, {
+					["Content-Type"] = "application/json",
+					["X-Flux-Client"] = "loader/" .. LOADER_VERSION,
+				})
+				if code ~= 200 then
+					return nil, friendlyError(code, body), code, decodeError(body)
+				end
+				local ok, data = pcall(HttpService.JSONDecode, HttpService, body)
+				if not ok or type(data) ~= "table" or type(data.token) ~= "string" or data.token == "" then
+					return nil, "BAD SERVER RESPONSE", 0, nil
+				end
+				return data.token, nil, 200, nil
+			end
+
+			local function fetchPayload(token)
+				local body, code = callApi("/v1/payload", "GET", nil, {
+					["Authorization"] = "Bearer " .. token,
+					["X-Flux-Hwid"] = HWID,
+					["X-Flux-Client"] = "loader/" .. LOADER_VERSION,
+				})
+				if code ~= 200 then
+					return nil, friendlyError(code, body), code, decodeError(body)
+				end
+				if type(body) ~= "string" or body == "" then
+					return nil, "EMPTY PAYLOAD", 0, nil
+				end
+				return body, nil, 200, nil
+			end
+
+			local function executePayload(body)
+				local loader = loadstring or load
+				if type(loader) ~= "function" then
+					return false, "EXECUTOR HAS NO LOADSTRING"
+				end
+				local compiled, chunk, loadError = pcall(loader, body)
+				if not compiled then
+					return false, "PAYLOAD COMPILE FAILED: " .. tostring(chunk)
+				end
+				if type(chunk) ~= "function" then
+					return false, "PAYLOAD COMPILE FAILED: " .. tostring(loadError)
+				end
+				local ok, runtimeError = pcall(chunk)
+				if not ok then
+					return false, "PAYLOAD RUNTIME FAILED: " .. tostring(runtimeError)
+				end
+				fluxExecuted = true
+				return true, nil
+			end
+
+			local function fetchKeyPayload(key)
+				local token, authError, authCode, authApiError = authenticate(key)
+				if not token then
+					return nil, authError, authCode, authApiError
+				end
+				local body, payloadError, payloadCode, payloadApiError = fetchPayload(token)
+				if not body then
+					return nil, payloadError, payloadCode, payloadApiError
+				end
+				return body, nil, 200, nil
+			end
+
+			local function shortMessage(message)
+				return string.sub(tostring(message or ""), 1, 140)
+			end
+
+			local function getGuiParents()
+				local parents = {}
+				if type(gethui) == "function" then
+					local ok, hidden = pcall(gethui)
+					if ok and hidden then
+						table.insert(parents, hidden)
+					end
+				end
+				local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+				if playerGui then
+					table.insert(parents, playerGui)
+				end
+				local ok, coreGui = pcall(function()
+					return game:GetService("CoreGui")
+				end)
+				if ok and coreGui then
+					table.insert(parents, coreGui)
+				end
+				return parents
+			end
+
+			local LOGO_PATTERN = {
+				".WWWWWW.",
+				".WKKWKW.",
+				".WGGWKW.",
+				".WWWWWW.",
+				"..W.W...",
+				".WWWW...",
+				".WKKW...",
+				".WWWW...",
+			}
+
+			local function buildLogo(parent, size)
+				local tile = Instance.new("Frame")
+				tile.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+				tile.Size = UDim2.fromOffset(size, size)
+				tile.BorderSizePixel = 0
+				tile.ClipsDescendants = true
+				tile.Parent = parent
+
+				local border = Instance.new("UIStroke")
+				border.Color = Color3.new(1, 1, 1)
+				border.Thickness = 1
+				border.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+				border.Parent = tile
+
+				local cell = math.max(2, math.floor((size - 6) / 8))
+				local gridSize = cell * 8
+				local offset = math.floor((size - gridSize) / 2)
+				for row, line in ipairs(LOGO_PATTERN) do
+					for column = 1, #line do
+						local symbol = line:sub(column, column)
+						local color
+						if symbol == "W" then
+							color = Color3.new(1, 1, 1)
+						elseif symbol == "G" then
+							color = Color3.fromRGB(138, 138, 138)
+						elseif symbol == "K" then
+							color = Color3.fromRGB(5, 5, 5)
+						end
+						if color then
+							local pixel = Instance.new("Frame")
+							pixel.BackgroundColor3 = color
+							pixel.BorderSizePixel = 0
+							pixel.Position = UDim2.fromOffset(offset + (column - 1) * cell, offset + (row - 1) * cell)
+							pixel.Size = UDim2.fromOffset(cell, cell)
+							pixel.Parent = tile
+						end
+					end
+				end
+				return tile
+			end
+
+			local function showLoading()
+				local parents = getGuiParents()
+				for _, parent in ipairs(parents) do
+					local old = parent:FindFirstChild("FluxGateLoader")
+					if old then
+						old:Destroy()
+					end
+				end
+
+				local screenGui = Instance.new("ScreenGui")
+				screenGui.Name = "FluxGateLoader"
+				screenGui.IgnoreGuiInset = true
+				screenGui.ResetOnSpawn = false
+				screenGui.DisplayOrder = 10001
+
+				local window = Instance.new("Frame")
+				window.AnchorPoint = Vector2.new(0.5, 0.5)
+				window.Position = UDim2.fromScale(0.5, 0.5)
+				window.Size = UDim2.fromOffset(340, 104)
+				window.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+				window.BorderSizePixel = 0
+				window.ClipsDescendants = true
+				window.Parent = screenGui
+
+				local scale = Instance.new("UIScale")
+				scale.Parent = window
+				local camera = workspace.CurrentCamera
+				local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+				scale.Scale = math.clamp(math.min(viewport.X / 380, viewport.Y / 170), 0.8, 1)
+
+				local border = Instance.new("UIStroke")
+				border.Color = Color3.fromRGB(255, 255, 255)
+				border.Thickness = 2
+				border.Parent = window
+
+				local logoHolder = Instance.new("Frame")
+				logoHolder.BackgroundTransparency = 1
+				logoHolder.Position = UDim2.fromOffset(14, 14)
+				logoHolder.Size = UDim2.fromOffset(30, 30)
+				logoHolder.Parent = window
+				buildLogo(logoHolder, 30)
+
+				local title = Instance.new("TextLabel")
+				title.BackgroundTransparency = 1
+				title.Position = UDim2.fromOffset(52, 12)
+				title.Size = UDim2.fromOffset(260, 18)
+				title.Font = Enum.Font.Arcade
+				title.Text = "FLUX GATE"
+				title.TextColor3 = Color3.fromRGB(255, 255, 255)
+				title.TextSize = 13
+				title.TextXAlignment = Enum.TextXAlignment.Left
+				title.Parent = window
+
+				local name = Instance.new("TextLabel")
+				name.BackgroundTransparency = 1
+				name.Position = UDim2.fromOffset(52, 31)
+				name.Size = UDim2.fromOffset(272, 14)
+				name.Font = Enum.Font.Arcade
+				name.Text = (SCRIPT_NAME ~= "" and SCRIPT_NAME or "PRIVATE MODULE")
+				name.TextColor3 = Color3.fromRGB(215, 215, 215)
+				name.TextSize = 10
+				name.TextXAlignment = Enum.TextXAlignment.Left
+				name.TextTruncate = Enum.TextTruncate.AtEnd
+				name.Parent = window
+
+				local status = Instance.new("TextLabel")
+				status.BackgroundTransparency = 1
+				status.Position = UDim2.fromOffset(52, 50)
+				status.Size = UDim2.fromOffset(260, 12)
+				status.Font = Enum.Font.Code
+				status.Text = "CHECKING ACCESS"
+				status.TextColor3 = Color3.fromRGB(125, 125, 125)
+				status.TextSize = 8
+				status.TextXAlignment = Enum.TextXAlignment.Left
+				status.Parent = window
+
+				local rule = Instance.new("Frame")
+				rule.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				rule.BackgroundTransparency = 0.82
+				rule.Position = UDim2.fromOffset(14, 74)
+				rule.Size = UDim2.fromOffset(312, 1)
+				rule.BorderSizePixel = 0
+				rule.Parent = window
+
+				local segments = {}
+				for index = 1, 10 do
+					local segment = Instance.new("Frame")
+					segment.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+					segment.Position = UDim2.fromOffset(14 + (index - 1) * 31, 84)
+					segment.Size = UDim2.fromOffset(28, 7)
+					segment.BorderSizePixel = 0
+					segment.Parent = window
+					table.insert(segments, segment)
+				end
+
+				local parented = false
+				for _, parent in ipairs(parents) do
+					local ok = pcall(function()
+						screenGui.Parent = parent
+					end)
+					if ok and screenGui.Parent == parent then
+						parented = true
+						break
+					end
+				end
+				if not parented then
+					screenGui:Destroy()
+					return nil
+				end
+
+				task.spawn(function()
+					local index = 1
+					while screenGui.Parent do
+						local segment = segments[index]
+						if not segment then
+							break
+						end
+						segment.BackgroundColor3 = Color3.new(1, 1, 1)
+						task.wait(0.075)
+						if not screenGui.Parent then
+							break
+						end
+						segment.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+						index = index % #segments + 1
+					end
+				end)
+
+				return screenGui
+			end
+
+			local function promptForKey(initialStatus, initialKey, keyMode)
+				local showInput = keyMode or (initialKey ~= nil and initialKey ~= "")
+				local actionLabel = keyMode and "UNLOCK" or "RETRY"
+				local parents = getGuiParents()
+				for _, parent in ipairs(parents) do
+					local old = parent:FindFirstChild("FluxAccessPrompt")
+					if old then
+						old:Destroy()
+					end
+				end
+
+				local screenGui = Instance.new("ScreenGui")
+				screenGui.Name = "FluxAccessPrompt"
+				screenGui.IgnoreGuiInset = true
+				screenGui.ResetOnSpawn = false
+				screenGui.DisplayOrder = 10000
+
+				local window = Instance.new("Frame")
+				window.AnchorPoint = Vector2.new(0.5, 0.5)
+				window.Position = UDim2.fromScale(0.5, 0.5)
+				window.Size = UDim2.fromOffset(320, 176)
+				window.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+				window.BorderSizePixel = 0
+				window.Parent = screenGui
+
+				local windowScale = Instance.new("UIScale")
+				windowScale.Parent = window
+				local camera = workspace.CurrentCamera
+				local viewport = camera and camera.ViewportSize or Vector2.new(1280, 720)
+				windowScale.Scale = math.clamp(math.min(viewport.X / 360, viewport.Y / 236), 0.8, 1)
+
+				local border = Instance.new("UIStroke")
+				border.Color = Color3.fromRGB(255, 255, 255)
+				border.Thickness = 2
+				border.Parent = window
+
+				local logoHolder = Instance.new("Frame")
+				logoHolder.BackgroundTransparency = 1
+				logoHolder.Position = UDim2.fromOffset(12, 12)
+				logoHolder.Size = UDim2.fromOffset(30, 30)
+				logoHolder.Parent = window
+				buildLogo(logoHolder, 30)
+
+				local title = Instance.new("TextLabel")
+				title.BackgroundTransparency = 1
+				title.Position = UDim2.fromOffset(50, 10)
+				title.Size = UDim2.fromOffset(232, 20)
+				title.Font = Enum.Font.Arcade
+				title.Text = "FLUX GATE"
+				title.TextColor3 = Color3.fromRGB(255, 255, 255)
+				title.TextSize = 12
+				title.TextXAlignment = Enum.TextXAlignment.Left
+				title.Parent = window
+
+				local subtitle = Instance.new("TextLabel")
+				subtitle.BackgroundTransparency = 1
+				subtitle.Position = UDim2.fromOffset(50, 30)
+				subtitle.Size = UDim2.fromOffset(232, 12)
+				subtitle.Font = Enum.Font.Code
+				subtitle.Text = keyMode and "ACCESS KEY"
+					or ((initialKey ~= nil and initialKey ~= "") and "RETRY" or "KEYLESS ACCESS")
+				subtitle.TextColor3 = Color3.fromRGB(150, 150, 150)
+				subtitle.TextSize = 8
+				subtitle.TextXAlignment = Enum.TextXAlignment.Left
+				subtitle.Parent = window
+
+				local close = Instance.new("TextButton")
+				close.AnchorPoint = Vector2.new(1, 0)
+				close.Position = UDim2.new(1, -10, 0, 9)
+				close.Size = UDim2.fromOffset(22, 22)
+				close.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+				close.BorderSizePixel = 0
+				close.Font = Enum.Font.Arcade
+				close.Text = "X"
+				close.TextColor3 = Color3.fromRGB(255, 255, 255)
+				close.TextSize = 9
+				close.AutoButtonColor = false
+				close.Parent = window
+				local closeBorder = Instance.new("UIStroke")
+				closeBorder.Color = Color3.fromRGB(255, 255, 255)
+				closeBorder.Thickness = 1
+				closeBorder.Transparency = 0.4
+				closeBorder.Parent = close
+
+				local input = Instance.new("TextBox")
+				input.Position = UDim2.fromOffset(12, 52)
+				input.Size = UDim2.fromOffset(296, 34)
+				input.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+				input.BorderSizePixel = 0
+				input.Font = Enum.Font.Code
+				input.PlaceholderText = "paste key"
+				input.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
+				input.Text = initialKey or ""
+				input.TextColor3 = Color3.fromRGB(255, 255, 255)
+				input.TextSize = 12
+				input.ClearTextOnFocus = false
+				input.TextEditable = true
+				input.Parent = window
+				local inputBorder = Instance.new("UIStroke")
+				inputBorder.Color = Color3.fromRGB(255, 255, 255)
+				inputBorder.Thickness = 1
+				inputBorder.Transparency = 0.45
+				inputBorder.Parent = input
+
+				local button = Instance.new("TextButton")
+				button.Position = UDim2.fromOffset(12, 96)
+				button.Size = UDim2.fromOffset(296, 34)
+				button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+				button.BorderSizePixel = 0
+				button.Font = Enum.Font.Arcade
+				button.Text = actionLabel
+				button.TextColor3 = Color3.fromRGB(5, 5, 5)
+				button.TextSize = 10
+				button.Parent = window
+
+				local status = Instance.new("TextLabel")
+				status.BackgroundTransparency = 1
+				status.Position = UDim2.fromOffset(12, 138)
+				status.Size = UDim2.fromOffset(296, 28)
+				status.Font = Enum.Font.Code
+				status.Text = shortMessage(initialStatus or "")
+				status.TextColor3 = Color3.fromRGB(150, 150, 150)
+				status.TextSize = 8
+				status.TextWrapped = true
+				status.TextXAlignment = Enum.TextXAlignment.Left
+				status.TextYAlignment = Enum.TextYAlignment.Top
+				status.Parent = window
+
+				if not showInput then
+					input.Visible = false
+					inputBorder.Visible = false
+					button.Position = UDim2.fromOffset(12, 52)
+					status.Position = UDim2.fromOffset(12, 96)
+					status.Size = UDim2.fromOffset(296, 60)
+				end
+
+				local parented = false
+				for _, parent in ipairs(parents) do
+					local ok = pcall(function()
+						screenGui.Parent = parent
+					end)
+					if ok and screenGui.Parent == parent then
+						parented = true
+						break
+					end
+				end
+				if not parented then
+					warn("[Flux] Loader: could not attach the key prompt.")
+					screenGui:Destroy()
+					return
+				end
+
+				local busy = false
+				local function submit()
+					if busy then
+						return
+					end
+					local key = showInput and input.Text:gsub("%s+", "") or ""
+					if showInput and key == "" then
+						status.Text = "ENTER A KEY"
+						return
+					end
+					busy = true
+					status.Text = "CHECKING..."
+					button.Text = "WAIT"
+					local body, message = fetchKeyPayload(key)
+					if not body then
+						status.Text = shortMessage(message)
+						button.Text = actionLabel
+						busy = false
+						return
+					end
+					saveKey(key)
+					screenGui:Destroy()
+					task.defer(function()
+						local ok, executeError = executePayload(body)
+						if not ok then
+							warn("[Flux] Loader: " .. tostring(executeError))
+						end
+					end)
+				end
+
+				button.MouseButton1Click:Connect(submit)
+				input.FocusLost:Connect(function(enterPressed)
+					if enterPressed then
+						submit()
+					end
+				end)
+				close.MouseButton1Click:Connect(function()
+					screenGui:Destroy()
+				end)
+			end
+
+			local savedKey = getSavedKey()
+			local loading = showLoading()
+			local body, message, code, apiError = fetchKeyPayload(savedKey)
+			if body then
+				saveKey(savedKey)
+				if loading then
+					loading:Destroy()
+				end
+				task.defer(function()
+					local executed, executeError = executePayload(body)
+					if not executed then
+						warn("[Flux] Loader: " .. tostring(executeError))
+					end
+				end)
+				return
+			end
+			if loading then
+				loading:Destroy()
+			end
+			local keyMode = apiError == "KEY_REQUIRED"
+				or apiError == "INVALID_KEY"
+				or apiError == "HWID_MISMATCH"
+				or apiError == "EXPIRED"
+				or apiError == "KEY_REVOKED"
+				or apiError == "TOKEN_INVALID"
+				or (code == 401 and savedKey ~= "")
+				or (code == 403 and savedKey ~= "")
+			promptForKey(shortMessage(message or "ACCESS REQUIRED"), savedKey, keyMode)
+		end
+
+		local function loadFluxKing()
+			if fluxExecuted then
+				pcall(notify, "King", "King tech sudah ter-load di sesi ini.", 3, "info")
+				return
+			end
+			if fluxRunning then return end
+			fluxRunning = true
+			task.spawn(function()
+				local ok, err = pcall(runFluxLoader)
+				if not ok then
+					warn("[RXM] King loader: " .. tostring(err))
+				end
+				fluxRunning = false
 			end)
 		end
 
-		local function activateKing(tech)
-			runGuarded(tech, function()
-				task.spawn(kingTween)
-				task.wait(math.max(0, tech.delay))
-				if not alive or not tech.enabled then return end
-				sendDashInput()
-				setHighlight((nearestPlayer()))
-				task.wait(math.max(0, tech.flick))
-				if not alive then return end
-				climbToTarget()
-				flipCamera()
-				task.wait(0.2)
-			end)
-		end
-
-		local handlers = {lethal = activateLethal, twisted = activateTwisted, oreo = activateOreo, king = activateKing}
+		local handlers = {lethal = activateLethal, twisted = activateTwisted}
 
 		local function hookCharacter(character)
 			if not alive then return end
@@ -4031,8 +4432,6 @@ local function Main()
 		connect(LocalPlayer.CharacterAdded, hookCharacter)
 
 		local RANGES = {
-			Oreo = {delay = {0, 1.5, 0.01}, jump = {0, 100, 0.5}, flick = {0, 1, 0.01}, endDelay = {0, 1, 0.01}},
-			King = {delay = {0, 1.5, 0.01}, flick = {0, 1, 0.01}},
 			Supa = {delay = {0, 1.5, 0.001}, jump = {0, 120, 0.001}},
 		}
 
@@ -4052,6 +4451,10 @@ local function Main()
 
 		for _, tech in ipairs(techs) do
 			tab:Section(tech.name)
+			if tech.kind == "flux" then
+				tab:Button({Name = "Load King tech", Callback = loadFluxKing})
+				continue
+			end
 			tab:Toggle({Name = tech.name, Default = tech.enabled, Callback = function(value)
 				tech.enabled = value
 				if not value and activeTech == tech then
@@ -4110,16 +4513,8 @@ local function Main()
 					if tech.flickBox then
 						addSlider(tech, "flick", "Flick delay (s)", {0, 1, 0.01})
 					end
-					if tech.endBox then
-						addSlider(tech, "endDelay", "End delay (s)", {0, 1, 0.01})
-					end
 					if tech.accuracyBox then
 						addSlider(tech, "accuracy", "Accuracy", {-40, 40, 0.01})
-					end
-					if tech.autoPosToggle then
-						tab:Toggle({Name = "Auto position", Default = tech.autoPos, Callback = function(value)
-							tech.autoPos = value
-						end})
 					end
 					if tech.cancelSwitch then
 						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
