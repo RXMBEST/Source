@@ -2975,7 +2975,7 @@ local function Main()
 				kind = "supa",
 				anim = "rbxassetid://10503381238",
 				enabled = false,
-				delay = 0.18,
+				delay = 0.299,
 				jump = 48,
 				accuracy = 6.5,
 				cancelDelay = 0.22,
@@ -3747,7 +3747,7 @@ local function Main()
 				Name = tech.name .. " config",
 				Build = function()
 					if tech.name == "Custom Tech" then
-						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
+						addSlider(tech, "delay", "delay (s)", {0, 5, 0.01})
 						addSlider(tech, "jump", "Jump power", {0, 200, 1})
 						addSlider(tech, "accuracy", "Accuracy", {0, 30, 0.05})
 						addSlider(tech, "cancelDelay", "Cancel delay (s)", {0, 3, 0.01})
@@ -3761,9 +3761,9 @@ local function Main()
 						return
 					end
 					if tech.kind == "lethal" then
-						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
-						addSlider(tech, "jump", "Vertical velocity", {0, 200, 1})
-						tech.accuracySlider = addSlider(tech, "accuracy", "Lethal accuracy", {-30, 30, 0.05})
+						addSlider(tech, "delay", "delay (s)", {0, 5, 0.01})
+						addSlider(tech, "jump", "Jump power", {0, 200, 1})
+						tech.accuracySlider = addSlider(tech, "accuracy", "accuracy", {-30, 30, 0.05})
 						addSlider(tech, "cancelDelay", "Cancel delay (s)", {0, 3, 0.01})
 						addSlider(tech, "range", "Target range", {1, 50, 1})
 						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
