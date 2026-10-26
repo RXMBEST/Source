@@ -1,12 +1,7 @@
---[[
-      RXM HUB  -  UI + Intro (standalone)
-]]
-
 local INTRO_TEXT = "亗 『 R X M H U B 』 🄾🄽 🅃🄾🄿 亗"
 local INTRO_SOUND = "rbxassetid://86045706626808"
 local INTRO_PROFILE = "rbxassetid://72115097738718"
-local INTRO_IMAGE_WAIT = 6.5
-
+local INTRO_IMAGE_WAIT = 6
 local function svc(name)
 	local service = game:GetService(name)
 	if cloneref then
@@ -14,7 +9,6 @@ local function svc(name)
 	end
 	return service
 end
-
 local Players = svc("Players")
 local TweenService = svc("TweenService")
 local UserInputService = svc("UserInputService")
@@ -22,12 +16,9 @@ local RunService = svc("RunService")
 local CoreGui = svc("CoreGui")
 local HttpService = svc("HttpService")
 local ContentProvider = svc("ContentProvider")
-
 local LocalPlayer = Players.LocalPlayer
 local ES, ED = Enum.EasingStyle, Enum.EasingDirection
-
 local requestFunc = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
-
 pcall(function()
 	if getgenv and getgenv().RXMHUBGUI then
 		getgenv().RXMHUBGUI.Destroy()
@@ -39,7 +30,6 @@ pcall(function()
 		old:Destroy()
 	end
 end)
-
 local function mountGui(gui)
 	if syn and syn.protect_gui then
 		pcall(syn.protect_gui, gui)
@@ -63,15 +53,12 @@ local function mountGui(gui)
 	end
 	return false
 end
-
 local function LoadProfileImage(maxWait, onLate)
 	local id = string.match(INTRO_PROFILE, "%d+")
 	if not id then return nil, false end
-
 	local won, timedOut = false, false
 	local result
 	local bestGuess = "rbxthumb://type=Asset&id=" .. id .. "&w=420&h=420"
-
 	local probeGui = Instance.new("ScreenGui")
 	probeGui.Name = "RizzXD_ProfileProbe"
 	probeGui.ResetOnSpawn = false
@@ -79,11 +66,9 @@ local function LoadProfileImage(maxWait, onLate)
 	if not mountGui(probeGui) then
 		return bestGuess, false
 	end
-
 	local function present()
 		return probeGui.Parent ~= nil
 	end
-
 	local function resolve(url)
 		if won then return end
 		won = true
@@ -92,7 +77,6 @@ local function LoadProfileImage(maxWait, onLate)
 			pcall(onLate, url)
 		end
 	end
-
 	local function attempt(url, timeout)
 		if won or not present() or type(url) ~= "string" or url == "" then return end
 		task.spawn(function()
@@ -121,23 +105,19 @@ local function LoadProfileImage(maxWait, onLate)
 			end)
 		end)
 	end
-
 	local function idFrom(text)
 		if type(text) ~= "string" then return nil end
 		return string.match(text, "(%d%d%d+)")
 	end
-
 	local function attemptImageId(imageId)
 		if not imageId then return end
 		bestGuess = "rbxassetid://" .. imageId
 		attempt("rbxassetid://" .. imageId, 5)
 		attempt("http://www.roblox.com/asset/?id=" .. imageId, 5)
 	end
-
 	attempt("rbxassetid://" .. id, 5)
 	attempt("http://www.roblox.com/asset/?id=" .. id, 5)
 	attempt("rbxthumb://type=Asset&id=" .. id .. "&w=420&h=420", 5)
-
 	task.spawn(function()
 		local okObj, objs = pcall(function()
 			return game:GetObjects("rbxassetid://" .. id)
@@ -164,7 +144,6 @@ local function LoadProfileImage(maxWait, onLate)
 			end
 		end
 	end)
-
 	local makeAsset = getcustomasset or getsynasset
 	local function fetch(url)
 		if not requestFunc then return nil end
@@ -202,7 +181,6 @@ local function LoadProfileImage(maxWait, onLate)
 		end
 		return fetch("https://assetdelivery.roblox.com/v1/asset/?id=" .. assetId)
 	end
-
 	if requestFunc then
 		task.spawn(function()
 			local body = download(id)
@@ -229,12 +207,10 @@ local function LoadProfileImage(maxWait, onLate)
 			end
 		end)
 	end
-
 	local t0 = os.clock()
 	while not won and os.clock() - t0 < (maxWait or 6) do
 		task.wait(0.05)
 	end
-
 	if won then
 		task.delay(2, function()
 			pcall(function()
@@ -243,7 +219,6 @@ local function LoadProfileImage(maxWait, onLate)
 		end)
 		return result, true
 	end
-
 	timedOut = true
 	task.delay(12, function()
 		pcall(function()
@@ -252,7 +227,6 @@ local function LoadProfileImage(maxWait, onLate)
 	end)
 	return bestGuess, false
 end
-
 local function PlayScreenIntro(onComplete)
 	local finished = false
 	local function complete()
@@ -262,7 +236,6 @@ local function PlayScreenIntro(onComplete)
 			task.spawn(onComplete)
 		end
 	end
-
 	local profileHook = {}
 	local okLoad, profileUrl, profileLoaded = pcall(LoadProfileImage, INTRO_IMAGE_WAIT, function(url)
 		if profileHook.show then
@@ -272,7 +245,6 @@ local function PlayScreenIntro(onComplete)
 	if not okLoad then
 		profileUrl, profileLoaded = nil, false
 	end
-
 	local IntroGui = Instance.new("ScreenGui")
 	IntroGui.Name = "RizzXD_ScreenIntro"
 	IntroGui.IgnoreGuiInset = true
@@ -282,7 +254,6 @@ local function PlayScreenIntro(onComplete)
 	IntroGui.ResetOnSpawn = false
 	IntroGui.DisplayOrder = 999999
 	IntroGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
 	if syn and syn.protect_gui then
 		pcall(syn.protect_gui, IntroGui)
 	end
@@ -306,7 +277,6 @@ local function PlayScreenIntro(onComplete)
 		complete()
 		return
 	end
-
 	local conn
 	local function cleanup()
 		if conn then
@@ -318,24 +288,20 @@ local function PlayScreenIntro(onComplete)
 		end)
 		complete()
 	end
-
 	task.delay(14, function()
 		if IntroGui.Parent then
 			cleanup()
 		end
 	end)
-
 	local built = pcall(function()
 		local viewport = (workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize) or Vector2.new(1280, 720)
 		local compact = UserInputService.TouchEnabled or viewport.X < 700
 		local rng = Random.new()
-
 		local RED = Color3.fromRGB(255, 25, 50)
 		local DEEP = Color3.fromRGB(150, 0, 18)
 		local PALE = Color3.fromRGB(255, 205, 210)
 		local WHITE = Color3.new(1, 1, 1)
 		local GLOW = "rbxassetid://5028857484"
-
 		local function make(class, props, parent)
 			local inst = Instance.new(class)
 			for key, value in pairs(props) do
@@ -358,7 +324,6 @@ local function PlayScreenIntro(onComplete)
 		local function circle(inst)
 			make("UICorner", {CornerRadius = UDim.new(0.5, 0)}, inst)
 		end
-
 		local Stage = make("CanvasGroup", {
 			Name = "Stage",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -371,7 +336,6 @@ local function PlayScreenIntro(onComplete)
 		}, IntroGui)
 		local stageScale = make("UIScale", {Scale = 1}, Stage)
 		tw(Stage, 0.55, {GroupTransparency = 0}, Enum.EasingStyle.Sine)
-
 		local IntroSound = make("Sound", {SoundId = INTRO_SOUND, Volume = 2}, IntroGui)
 		task.spawn(function()
 			pcall(function()
@@ -381,7 +345,6 @@ local function PlayScreenIntro(onComplete)
 				IntroSound:Play()
 			end)
 		end)
-
 		local fogCfg = {
 			{size = 980, color = RED, base = 0.74, sx = 0.38, sy = 0.31, ax = 0.20, ay = 0.14, ph = 0},
 			{size = 760, color = DEEP, base = 0.62, sx = 0.27, sy = 0.44, ax = 0.26, ay = 0.18, ph = 2.1},
@@ -399,7 +362,6 @@ local function PlayScreenIntro(onComplete)
 				ZIndex = 1,
 			}, Stage)
 		end
-
 		local streaks = {}
 		for i = 1, compact and 4 or 6 do
 			local frame = make("Frame", {
@@ -417,7 +379,6 @@ local function PlayScreenIntro(onComplete)
 			}, frame)
 			streaks[i] = {frame = frame, speed = rng:NextNumber(0.05, 0.12), phase = rng:NextNumber(0, 1)}
 		end
-
 		local beamHalo = make("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0),
@@ -441,7 +402,6 @@ local function PlayScreenIntro(onComplete)
 		make("UIGradient", {
 			Transparency = NumberSequence.new({kp(0, 1), kp(0.5, 0.2), kp(1, 1)}),
 		}, beam)
-
 		local particles = {}
 		local function resetParticle(p, initial)
 			p.x = rng:NextNumber(0.02, 0.98)
@@ -477,7 +437,6 @@ local function PlayScreenIntro(onComplete)
 			resetParticle(p, true)
 			particles[i] = p
 		end
-
 		local function edge(anchor, pos, size, rot)
 			local f = make("Frame", {
 				AnchorPoint = anchor,
@@ -493,7 +452,6 @@ local function PlayScreenIntro(onComplete)
 		edge(Vector2.new(0.5, 1), UDim2.fromScale(0.5, 1), UDim2.fromScale(1, 0.3), -90)
 		edge(Vector2.new(0, 0.5), UDim2.fromScale(0, 0.5), UDim2.fromScale(0.22, 1), 0)
 		edge(Vector2.new(1, 0.5), UDim2.fromScale(1, 0.5), UDim2.fromScale(0.22, 1), 180)
-
 		local brackets = {}
 		local function bracket(ax, ay)
 			local m, len, th = 18, 34, 2
@@ -513,10 +471,8 @@ local function PlayScreenIntro(onComplete)
 		bracket(1, 0)
 		bracket(0, 1)
 		bracket(1, 1)
-
 		local E = compact and 112 or 180
 		local EY = 0.36
-
 		local Emblem = make("Frame", {
 			Name = "Emblem",
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -527,7 +483,6 @@ local function PlayScreenIntro(onComplete)
 		}, Stage)
 		local emblemScale = make("UIScale", {Scale = 0.3}, Emblem)
 		tw(emblemScale, 0.95, {Scale = 1}, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
 		local coreGlow = make("ImageLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
@@ -538,7 +493,6 @@ local function PlayScreenIntro(onComplete)
 			ImageTransparency = 0.55,
 			ZIndex = 1,
 		}, Emblem)
-
 		local ticks = make("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
@@ -559,7 +513,6 @@ local function PlayScreenIntro(onComplete)
 				BorderSizePixel = 0,
 			}, ticks)
 		end
-
 		local function ring(size, thickness, trans, colors)
 			local f = make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -577,7 +530,6 @@ local function PlayScreenIntro(onComplete)
 			local grad = make("UIGradient", {Color = colors, Transparency = trans}, stroke)
 			return f, stroke, grad
 		end
-
 		local _, _, outerGrad = ring(E, 3,
 			NumberSequence.new({kp(0, 1), kp(0.12, 0.1), kp(0.42, 0), kp(0.58, 1), kp(1, 1)}),
 			ColorSequence.new({ck(0, RED), ck(0.5, PALE), ck(1, DEEP)}))
@@ -587,7 +539,6 @@ local function PlayScreenIntro(onComplete)
 		local _, innerStroke = ring(E * 0.6, 1.5,
 			NumberSequence.new({kp(0, 0), kp(1, 0)}),
 			ColorSequence.new({ck(0, RED), ck(1, RED)}))
-
 		local core = make("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
@@ -622,7 +573,6 @@ local function PlayScreenIntro(onComplete)
 			ZIndex = 5,
 		}, core)
 		circle(profileImage)
-
 		local function showProfile(url, instant)
 			if not profileImage.Parent then return end
 			profileImage.Image = url
@@ -642,7 +592,6 @@ local function PlayScreenIntro(onComplete)
 				showProfile(url, false)
 			end
 		end
-
 		local orbits = {}
 		for i = 1, 3 do
 			local frame = make("Frame", {
@@ -664,7 +613,6 @@ local function PlayScreenIntro(onComplete)
 			}, frame)
 			orbits[i] = {frame = frame, speed = 1.3 + i * 0.55, phase = i * 2.09}
 		end
-
 		local function shockwave(fromSize, toSize, life, thick)
 			local f = make("Frame", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -686,7 +634,6 @@ local function PlayScreenIntro(onComplete)
 				f:Destroy()
 			end)
 		end
-
 		local titleOff = E / 2 + (compact and 34 or 48)
 		local titleHolder = make("Frame", {
 			Name = "Title",
@@ -696,7 +643,6 @@ local function PlayScreenIntro(onComplete)
 			BackgroundTransparency = 1,
 			ZIndex = 7,
 		}, Stage)
-
 		local function titleLabel(color, z)
 			local label = make("TextLabel", {
 				AnchorPoint = Vector2.new(0.5, 0.5),
@@ -725,7 +671,6 @@ local function PlayScreenIntro(onComplete)
 		local titleGrad = make("UIGradient", {
 			Color = ColorSequence.new({ck(0, Color3.fromRGB(255, 20, 40)), ck(0.5, WHITE), ck(1, Color3.fromRGB(180, 0, 20))}),
 		}, titleMain)
-
 		local subtitle = make("TextLabel", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.new(0.5, 0, EY, titleOff + (compact and 28 or 36)),
@@ -738,7 +683,6 @@ local function PlayScreenIntro(onComplete)
 			TextTransparency = 1,
 			ZIndex = 7,
 		}, Stage)
-
 		local barW = math.clamp(viewport.X * 0.6, 240, 460)
 		local bar = make("Frame", {
 			Name = "Bar",
@@ -825,7 +769,6 @@ local function PlayScreenIntro(onComplete)
 			ImageTransparency = 0.3,
 			ZIndex = 11,
 		}, track)
-
 		local STATUS = {
 			{0, "Initializing core"},
 			{0.16, "Loading modules"},
@@ -833,7 +776,6 @@ local function PlayScreenIntro(onComplete)
 			{0.64, "Applying Crimson Noir theme"},
 			{0.88, "Finalizing"},
 		}
-
 		local flash = make("Frame", {
 			Size = UDim2.fromScale(1, 1),
 			BackgroundColor3 = Color3.fromRGB(255, 70, 90),
@@ -841,7 +783,6 @@ local function PlayScreenIntro(onComplete)
 			BorderSizePixel = 0,
 			ZIndex = 30,
 		}, Stage)
-
 		local t = 0
 		local BAR_START, BAR_END = 0.35, 5.0
 		local TYPE_START, TYPE_RATE = 0.7, 0.055
@@ -850,10 +791,8 @@ local function PlayScreenIntro(onComplete)
 		local glitchUntil, nextGlitch, nextWave = 0, 2.6, 0.9
 		local subShown, exiting, faded = false, false, false
 		local exitAt = 0
-
 		local function step(dt)
 			t = t + dt
-
 			for _, cfg in ipairs(fogCfg) do
 				cfg.img.Position = UDim2.fromScale(0.5 + cfg.ax * math.sin(t * cfg.sx + cfg.ph), 0.5 + cfg.ay * math.cos(t * cfg.sy + cfg.ph))
 				cfg.img.ImageTransparency = cfg.base + 0.06 * math.sin(t * 1.3 + cfg.ph)
@@ -864,7 +803,6 @@ local function PlayScreenIntro(onComplete)
 			local by = ((t * 0.2) % 1.25) - 0.12
 			beam.Position = UDim2.fromScale(0.5, by)
 			beamHalo.Position = UDim2.fromScale(0.5, by)
-
 			for _, p in ipairs(particles) do
 				p.y = p.y - p.vy * dt
 				if p.y < -0.06 then
@@ -875,12 +813,10 @@ local function PlayScreenIntro(onComplete)
 				p.frame.BackgroundTransparency = 1 - vis * p.alpha
 				p.glow.ImageTransparency = 1 - vis * 0.5
 			end
-
 			local ba = 0.25 + 0.2 * math.sin(t * 2.4)
 			for _, f in ipairs(brackets) do
 				f.BackgroundTransparency = ba
 			end
-
 			outerGrad.Rotation = (t * 150) % 360
 			midGrad.Rotation = 360 - (t * 95) % 360
 			ticks.Rotation = (t * 14) % 360
@@ -898,7 +834,6 @@ local function PlayScreenIntro(onComplete)
 				nextWave = t + 1.5
 				shockwave(E * 0.55, E * 2.6, 1.35, 3)
 			end
-
 			local shown = math.clamp(math.floor((t - TYPE_START) / TYPE_RATE), 0, len)
 			if shown ~= lastShown then
 				lastShown = shown
@@ -914,7 +849,6 @@ local function PlayScreenIntro(onComplete)
 				ghostB.Text = txt
 			end
 			titleGrad.Rotation = (titleGrad.Rotation + dt * 200) % 360
-
 			if t >= nextGlitch and shown >= len then
 				glitchUntil = t + 0.16
 				nextGlitch = t + rng:NextNumber(1.1, 2.4)
@@ -931,12 +865,10 @@ local function PlayScreenIntro(onComplete)
 				ghostB.TextTransparency = 1
 				titleMain.Position = UDim2.fromScale(0.5, 0.5)
 			end
-
 			if not subShown and t > 2.0 then
 				subShown = true
 				tw(subtitle, 0.8, {TextTransparency = 0.15}, Enum.EasingStyle.Quad)
 			end
-
 			local u = math.clamp((t - BAR_START) / (BAR_END - BAR_START), 0, 1)
 			local p = u * u * (3 - 2 * u)
 			fill.Size = UDim2.fromScale(p, 1)
@@ -957,7 +889,6 @@ local function PlayScreenIntro(onComplete)
 					statusLabel.Text = STATUS[idx][2]
 				end
 			end
-
 			if not exiting and u >= 1 then
 				exiting, exitAt = true, t
 				percent.Text = "100%"
@@ -983,7 +914,6 @@ local function PlayScreenIntro(onComplete)
 				end
 			end
 		end
-
 		local fails = 0
 		conn = RunService.Heartbeat:Connect(function(rawDt)
 			local ok = pcall(step, math.min(rawDt, 0.05))
@@ -995,19 +925,16 @@ local function PlayScreenIntro(onComplete)
 			end
 		end)
 	end)
-
 	if not built then
 		cleanup()
 	end
 end
-
 local function Main()
 	local alive = true
 	local connections = {}
 	local accent = Color3.fromRGB(255, 35, 60)
 	local tintColor = accent
 	local accentBinds = {}
-
 	local T = {
 		black = Color3.new(0, 0, 0),
 		card = Color3.fromRGB(20, 13, 14),
@@ -1021,7 +948,6 @@ local function Main()
 		dark = Color3.fromRGB(24, 6, 8),
 		btn = Color3.fromRGB(34, 21, 23),
 	}
-
 	local state = "idle"
 	local hidden = false
 	local hover = false
@@ -1036,15 +962,12 @@ local function Main()
 	local bounceAmt, curProfile = 1, nil
 	local hTok, morphTok = 0, 0
 	local swiped = false
-
 	local setState, notify, setHidden
-
 	local function connect(signal, fn)
 		local c = signal:Connect(fn)
 		table.insert(connections, c)
 		return c
 	end
-
 	local function new(class, props)
 		local inst = Instance.new(class)
 		local parent
@@ -1058,56 +981,45 @@ local function Main()
 		inst.Parent = parent
 		return inst
 	end
-
 	local function corner(inst, radius)
 		return new("UICorner", {CornerRadius = UDim.new(0, radius), Parent = inst})
 	end
-
 	local function round(inst)
 		return new("UICorner", {CornerRadius = UDim.new(0.5, 0), Parent = inst})
 	end
-
 	local function tween(inst, time, props, style, direction, delay)
 		local info = TweenInfo.new(time, style or ES.Exponential, direction or ED.Out, 0, false, delay or 0)
 		local t = TweenService:Create(inst, info, props)
 		t:Play()
 		return t
 	end
-
 	local function bindAccent(fn)
 		table.insert(accentBinds, fn)
 		fn(accent)
 	end
-
 	local function setAccent(color)
 		accent = color
 		for _, fn in ipairs(accentBinds) do
 			pcall(fn, color)
 		end
 	end
-
 	local function lerpColor(a, b, t)
 		return a:Lerp(b, t)
 	end
-
 	local function isPress(input)
 		return input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch
 	end
-
 	local function isMove(input)
 		return input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch
 	end
-
 	local function newSpring(value, k, ratio)
 		return {x = value, v = 0, t = value, k = k, d = 2 * ratio * math.sqrt(k)}
 	end
-
 	local function tuneSpring(s, k, ratio)
 		s.k = k
 		local r = math.clamp(1 - (1 - ratio) * bounceAmt, 0.25, 1)
 		s.d = 2 * r * math.sqrt(k)
 	end
-
 	local function stepSpring(s, dt)
 		local n = math.max(1, math.ceil(dt * 120))
 		local h = dt / n
@@ -1116,11 +1028,9 @@ local function Main()
 			s.x = s.x + s.v * h
 		end
 	end
-
 	local function kindColor(kind)
 		return accent
 	end
-
 	local gui = new("ScreenGui", {
 		Name = "RXMHUB",
 		ResetOnSpawn = false,
@@ -1128,7 +1038,6 @@ local function Main()
 		DisplayOrder = 100,
 		IgnoreGuiInset = true,
 	})
-
 	do
 		if syn and syn.protect_gui then
 			pcall(syn.protect_gui, gui)
@@ -1148,9 +1057,7 @@ local function Main()
 			gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 		end
 	end
-
 	local isTouch = UserInputService.TouchEnabled
-
 	local clickEnabled = true
 	local playClick
 	do
@@ -1173,7 +1080,6 @@ local function Main()
 				Parent = gui,
 			})
 		end
-
 		playClick = function(speed, volume)
 			if not clickEnabled or not alive then return end
 			clickNext = clickNext % #clickPool + 1
@@ -1183,7 +1089,6 @@ local function Main()
 			snd.TimePosition = 0
 			snd:Play()
 		end
-
 		task.spawn(function()
 			local probe = clickPool[1]
 			for _, id in ipairs(CLICK_IDS) do
@@ -1206,32 +1111,27 @@ local function Main()
 			end
 		end)
 	end
-
 	local function viewportSize()
 		local cam = workspace.CurrentCamera
 		return cam and cam.ViewportSize or Vector2.new(1280, 720)
 	end
 	local viewport = viewportSize()
-
 	local IDLE_W, IDLE_H = 142, 36
 	local NOTIFY_H = 64
 	local PAD_Y = 8
 	local PANEL_R = 30
 	local HEADER_H, TABBAR_H = 46, 34
 	local PAGE_TOP = HEADER_H + TABBAR_H + 8
-
 	local W, H = 450, 360
 	if isTouch or viewport.X < 700 then
 		W = math.clamp(viewport.X - 24, 290, 410)
 		H = math.clamp(viewport.Y - 70, 236, 320)
 	end
-
 	local BOUNCE_DEFAULT = 45
 	local function ratioFromBounce(b)
 		return 1 - (b / 100) * 0.62
 	end
 	local R0 = ratioFromBounce(BOUNCE_DEFAULT)
-
 	local sp = {
 		w = newSpring(IDLE_W, 190, R0),
 		h = newSpring(IDLE_H, 210, R0),
@@ -1242,7 +1142,6 @@ local function Main()
 		show = newSpring(1, 170, 0.72),
 		hy = newSpring(0, 170, 0.76),
 	}
-
 	local PROFILES = {
 		open = {w = {175, 0.64}, h = {150, 0.66}, r = {210, 0.72}},
 		close = {w = {250, 0.82}, h = {270, 0.86}, r = {270, 0.86}},
@@ -1251,14 +1150,12 @@ local function Main()
 		swap = {w = {225, 0.70}, h = {245, 0.74}, r = {260, 0.80}},
 		minimize = {w = {230, 0.80}, h = {250, 0.84}, r = {250, 0.88}},
 	}
-
 	local function applyProfile(p)
 		curProfile = p
 		tuneSpring(sp.w, p.w[1], p.w[2])
 		tuneSpring(sp.h, p.h[1], p.h[2])
 		tuneSpring(sp.r, p.r[1], p.r[2])
 	end
-
 	local backdrop = new("TextButton", {
 		Name = "Backdrop",
 		BackgroundTransparency = 1,
@@ -1269,7 +1166,6 @@ local function Main()
 		Visible = false,
 		Parent = gui,
 	})
-
 	local shell = new("Frame", {
 		Name = "Island",
 		ZIndex = 5,
@@ -1280,7 +1176,6 @@ local function Main()
 		Parent = gui,
 	})
 	local shellScale = new("UIScale", {Scale = 0.001, Parent = shell})
-
 	local glows
 	do
 		local function haloLayers(name, count, spread, drop, color, total)
@@ -1321,7 +1216,6 @@ local function Main()
 			glow.frame.BackgroundColor3 = color
 		end
 	end)
-
 	local island = new("CanvasGroup", {
 		Name = "Body",
 		Size = UDim2.fromScale(1, 1),
@@ -1332,7 +1226,6 @@ local function Main()
 		Parent = shell,
 	})
 	local islandCorner = corner(island, IDLE_H / 2)
-
 	local borderFrame = new("Frame", {
 		Name = "Border",
 		Size = UDim2.fromScale(1, 1),
@@ -1360,7 +1253,6 @@ local function Main()
 		})
 	end
 	paintBorder(tintColor)
-
 	local function ringFlash()
 		if not alive then return end
 		for i = 1, 2 do
@@ -1388,10 +1280,8 @@ local function Main()
 			end)
 		end
 	end
-
 	local PANEL_DROP = math.floor(IDLE_H * UI_SCALE + 8)
 	local panelPos = {x = 0, y = PANEL_DROP}
-
 	local function panelLimits()
 		local vp = viewportSize()
 		local maxX = math.max(0, vp.X / 2 - W * UI_SCALE / 2 - 4)
@@ -1399,9 +1289,7 @@ local function Main()
 		local maxY = math.max(minY, vp.Y - 4 - PAD_Y - H * UI_SCALE)
 		return maxX, minY, maxY
 	end
-
 	local groups = {}
-
 	local function makeGroup(name, w, h)
 		local frame = new("CanvasGroup", {
 			Name = name,
@@ -1419,7 +1307,6 @@ local function Main()
 		table.insert(groups, entry)
 		return entry
 	end
-
 	local function fadeGroup(entry, on, delay, dur)
 		entry.tok = entry.tok + 1
 		local tok = entry.tok
@@ -1446,13 +1333,11 @@ local function Main()
 			apply()
 		end
 	end
-
 	local idleG = makeGroup("Idle", IDLE_W, IDLE_H)
 	local notifyG = makeGroup("Notify", noticeW, NOTIFY_H)
 	local expG = makeGroup("Panel", W, H)
 	new("UICorner", {CornerRadius = UDim.new(0, PANEL_R), Parent = expG.frame})
 	local panel = expG.frame
-
 	local idleHalo = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.new(0, 18, 0.5, 0),
@@ -1472,7 +1357,6 @@ local function Main()
 		Parent = idleG.frame,
 	})
 	round(idleDot)
-
 	local idleLabel = new("TextLabel", {
 		Position = UDim2.new(0, 30, 0, 0),
 		Size = UDim2.new(1, -66, 1, 0),
@@ -1487,7 +1371,6 @@ local function Main()
 	})
 	new("UITextSizeConstraint", {MaxTextSize = 12, MinTextSize = 8, Parent = idleLabel})
 	local idleGradient = new("UIGradient", {Offset = Vector2.new(-1, 0), Parent = idleLabel})
-
 	local barBox = new("Frame", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -14, 0.5, 0),
@@ -1508,7 +1391,6 @@ local function Main()
 		round(bar)
 		idleBars[i] = bar
 	end
-
 	bindAccent(function(color)
 		idleHalo.BackgroundColor3 = color
 		idleDot.BackgroundColor3 = color
@@ -1522,10 +1404,8 @@ local function Main()
 			ColorSequenceKeypoint.new(1, base),
 		})
 	end)
-
 	local idleRest = {dot = idleDot.Position, halo = idleHalo.Position, bars = barBox.Position}
 	local idleTok = 0
-
 	local function idleIntro(delay)
 		idleTok = idleTok + 1
 		local tok = idleTok
@@ -1541,7 +1421,6 @@ local function Main()
 			tween(idleLabel, 0.4, {TextTransparency = 0}, ES.Quad, ED.Out, 0.04)
 		end)
 	end
-
 	local function idleOutro()
 		idleTok = idleTok + 1
 		tween(idleDot, 0.16, {Position = idleRest.dot + UDim2.fromOffset(10, 0)}, ES.Quad, ED.In)
@@ -1549,7 +1428,6 @@ local function Main()
 		tween(barBox, 0.16, {Position = idleRest.bars + UDim2.fromOffset(-10, 0)}, ES.Quad, ED.In)
 		tween(idleLabel, 0.12, {TextTransparency = 1}, ES.Quad, ED.In)
 	end
-
 	local function buildRing(parent, diameter, thickness)
 		local ring = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
@@ -1573,7 +1451,6 @@ local function Main()
 			ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 			Parent = track,
 		})
-
 		local seq = NumberSequence.new({
 			NumberSequenceKeypoint.new(0, 0),
 			NumberSequenceKeypoint.new(0.5, 0),
@@ -1609,7 +1486,6 @@ local function Main()
 				Parent = strokes[i],
 			})
 		end
-
 		local obj = {frame = ring}
 		function obj.Set(p)
 			p = math.clamp(p, 0, 1)
@@ -1622,13 +1498,11 @@ local function Main()
 		end
 		return obj
 	end
-
 	local function buildNotice(parent, h, bind)
 		local n = {kind = "info"}
 		local iconD = math.floor(h * 0.5)
 		local ringD = iconD + 10
 		n.ring = buildRing(parent, ringD, 2.5)
-
 		local icon = new("Frame", {
 			AnchorPoint = Vector2.new(0.5, 0.5),
 			Position = UDim2.fromScale(0.5, 0.5),
@@ -1639,7 +1513,6 @@ local function Main()
 			Parent = n.ring.frame,
 		})
 		round(icon)
-
 		local textX = 12 + ringD + 12
 		local title = new("TextLabel", {
 			Position = UDim2.new(0, textX, 0.5, -17),
@@ -1665,7 +1538,6 @@ local function Main()
 			TextTruncate = Enum.TextTruncate.AtEnd,
 			Parent = parent,
 		})
-
 		local function glyph(kind, color)
 			for _, child in ipairs(icon:GetChildren()) do
 				if not child:IsA("UICorner") then
@@ -1702,7 +1574,6 @@ local function Main()
 				})
 			end
 		end
-
 		function n:Recolor()
 			local color = kindColor(n.kind)
 			icon.BackgroundColor3 = color
@@ -1715,11 +1586,9 @@ local function Main()
 			message.Text = tostring(text or "")
 			n:Recolor()
 		end
-
 		local ringScale = new("UIScale", {Scale = 1, Parent = n.ring.frame})
 		local titleRest, messageRest = title.Position, message.Position
 		local introTok, swapTok = 0, 0
-
 		function n:Intro(delay)
 			introTok = introTok + 1
 			local tok = introTok
@@ -1735,7 +1604,6 @@ local function Main()
 				tween(message, 0.5, {TextTransparency = 0, Position = messageRest}, ES.Quint, ED.Out, 0.09)
 			end)
 		end
-
 		function n:Swap(kind, heading, text)
 			swapTok = swapTok + 1
 			local tok = swapTok
@@ -1757,7 +1625,6 @@ local function Main()
 				end
 			end)
 		end
-
 		if bind then
 			bindAccent(function()
 				n:Recolor()
@@ -1766,9 +1633,7 @@ local function Main()
 		n:Recolor()
 		return n
 	end
-
 	local notice = buildNotice(notifyG.frame, NOTIFY_H, true)
-
 	local TOAST = {
 		w = math.min(300, viewport.X - 28),
 		h = 58,
@@ -1777,7 +1642,6 @@ local function Main()
 		edgeY = isTouch and 108 or 16,
 		max = 4,
 	}
-
 	local toastHolder = new("Frame", {
 		Name = "Toasts",
 		AnchorPoint = Vector2.new(1, 1),
@@ -1795,11 +1659,9 @@ local function Main()
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = toastHolder,
 	})
-
 	local function floatToast(item)
 		if not alive then return end
 		local TW, TH = TOAST.w, TOAST.h
-
 		local existing = {}
 		for _, child in ipairs(toastHolder:GetChildren()) do
 			if child:IsA("Frame") then
@@ -1809,7 +1671,6 @@ local function Main()
 		if #existing >= TOAST.max then
 			existing[1]:Destroy()
 		end
-
 		toastSeq = toastSeq + 1
 		local slot = new("Frame", {
 			Size = UDim2.fromOffset(TW, TH),
@@ -1844,16 +1705,13 @@ local function Main()
 			Parent = stroke,
 		})
 		local sc = new("UIScale", {Scale = 0.9, Parent = pill})
-
 		local n = buildNotice(pill, TH, false)
 		n:Set(item.kind, item.heading, item.message)
 		n:Intro(0.12)
 		item.ui = {n = n}
-
 		tween(pill, 0.6, {Position = UDim2.new(1, 0, 0, 0)}, ES.Back, ED.Out)
 		tween(pill, 0.3, {GroupTransparency = 0}, ES.Quad, ED.Out)
 		tween(sc, 0.6, {Scale = 1}, ES.Back, ED.Out)
-
 		local dismissed = false
 		local function dismiss()
 			if dismissed then return end
@@ -1870,7 +1728,6 @@ local function Main()
 				end
 			end)
 		end
-
 		local hit = new("TextButton", {
 			BackgroundTransparency = 1,
 			Text = "",
@@ -1919,7 +1776,6 @@ local function Main()
 				end
 			end)
 		end)
-
 		local duration = item.duration or 3.5
 		task.spawn(function()
 			local t0 = os.clock()
@@ -1945,7 +1801,6 @@ local function Main()
 			dismiss()
 		end)
 	end
-
 	local auroraBlobs = {}
 	for i, cfg in ipairs({{250, 0.2, 0.9}, {210, 0.85, 0.2}}) do
 		local holder = new("Frame", {
@@ -1975,7 +1830,6 @@ local function Main()
 			blob.frame.BackgroundColor3 = color
 		end
 	end)
-
 	local header = new("Frame", {
 		Name = "Header",
 		Size = UDim2.new(1, 0, 0, HEADER_H),
@@ -2028,7 +1882,6 @@ local function Main()
 			ColorSequenceKeypoint.new(1, base),
 		})
 	end)
-
 	local tabBar = new("Frame", {
 		Name = "Tabs",
 		Position = UDim2.new(0, 12, 0, HEADER_H),
@@ -2066,7 +1919,6 @@ local function Main()
 		highlight.BackgroundColor3 = color
 		highlightStroke.Color = color
 	end)
-
 	new("Frame", {
 		Position = UDim2.new(0, 14, 0, PAGE_TOP - 5),
 		Size = UDim2.new(1, -28, 0, 1),
@@ -2101,7 +1953,6 @@ local function Main()
 			ColorSequenceKeypoint.new(1, color),
 		})
 	end)
-
 	local pageHost = new("Frame", {
 		Name = "Pages",
 		Position = UDim2.new(0, 12, 0, PAGE_TOP),
@@ -2112,7 +1963,6 @@ local function Main()
 		Parent = panel,
 	})
 	local chromeRest = {header = header.Position, tabs = tabBar.Position, pages = pageHost.Position}
-
 	local function revealChrome(delay)
 		header.Position = chromeRest.header + UDim2.fromOffset(0, -10)
 		tabBar.Position = chromeRest.tabs + UDim2.fromOffset(0, -8)
@@ -2121,13 +1971,11 @@ local function Main()
 		tween(tabBar, 0.65, {Position = chromeRest.tabs}, ES.Quint, ED.Out, delay + 0.04)
 		tween(pageHost, 0.65, {Position = chromeRest.pages}, ES.Quint, ED.Out, delay + 0.08)
 	end
-
 	local function hideChrome()
 		tween(header, 0.22, {Position = chromeRest.header + UDim2.fromOffset(0, -6)}, ES.Quad, ED.In)
 		tween(tabBar, 0.22, {Position = chromeRest.tabs + UDim2.fromOffset(0, -4)}, ES.Quad, ED.In)
 		tween(pageHost, 0.22, {Position = chromeRest.pages + UDim2.fromOffset(0, 6)}, ES.Quad, ED.In)
 	end
-
 	local fadeBottom = new("Frame", {
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 0, 1, 0),
@@ -2145,7 +1993,6 @@ local function Main()
 		}),
 		Parent = fadeBottom,
 	})
-
 	local embers = new("Frame", {
 		Name = "Embers",
 		Size = UDim2.fromScale(1, 1),
@@ -2173,7 +2020,6 @@ local function Main()
 		bindAccent(function(color)
 			hazeGradient.Color = ColorSequence.new(color)
 		end)
-
 		local function spawnSpark()
 			if not embers.Parent then return end
 			local size = math.random(2, 4)
@@ -2181,7 +2027,6 @@ local function Main()
 			local drift = (math.random() - 0.5) * 0.14
 			local travel = 0.4 + math.random() * 0.5
 			local life = 3 + math.random() * 3
-
 			local spark = new("Frame", {
 				BackgroundColor3 = lerpColor(accent, Color3.new(1, 0.85, 0.6), math.random() * 0.6),
 				BackgroundTransparency = 1,
@@ -2203,7 +2048,6 @@ local function Main()
 				spark:Destroy()
 			end)
 		end
-
 		for _ = 1, isTouch and 5 or 9 do
 			task.spawn(function()
 				task.wait(math.random() * 4)
@@ -2218,7 +2062,6 @@ local function Main()
 			end)
 		end
 	end
-
 	local function applyFX()
 		neonLine.BackgroundTransparency = fx.neon and 0 or 1
 		titleGradient.Enabled = fx.shimmer
@@ -2227,14 +2070,11 @@ local function Main()
 			blob.frame.Visible = fx.aurora
 		end
 	end
-
 	local Tab = {}
 	Tab.__index = Tab
-
 	local tabs = {}
 	local currentTab = nil
 	local hlToken = 0
-
 	local function moveHighlight(index, instant)
 		local n = math.max(#tabs, 1)
 		local toX = (index - 1) / n
@@ -2257,7 +2097,6 @@ local function Main()
 			tween(highlight, 0.45, {Position = UDim2.new(toX, 3, 0, 3), Size = restSize}, ES.Back, ED.Out)
 		end)
 	end
-
 	local function layoutTabs()
 		local n = #tabs
 		for i, tab in ipairs(tabs) do
@@ -2268,9 +2107,7 @@ local function Main()
 			moveHighlight(currentTab.index, true)
 		end
 	end
-
 	local SLIDE_T = 0.42
-
 	local function slideOut(tab, dir)
 		tab.slideTok = tab.slideTok + 1
 		local tok = tab.slideTok
@@ -2283,7 +2120,6 @@ local function Main()
 			end
 		end)
 	end
-
 	local function slideIn(tab, dir)
 		tab.slideTok = tab.slideTok + 1
 		tab.page.ZIndex = 3
@@ -2301,7 +2137,6 @@ local function Main()
 			task.delay(0.1 + math.min(i, 10) * 0.04, entry.sweep)
 		end
 	end
-
 	local function selectTab(tab)
 		if currentTab == tab then return end
 		local old = currentTab
@@ -2316,10 +2151,8 @@ local function Main()
 		moveHighlight(tab.index)
 		slideIn(tab, dir)
 	end
-
 	local function addTab(name)
 		local tab = setmetatable({Name = name, cards = {}, n = 0, index = #tabs + 1, slideTok = 0}, Tab)
-
 		local button = new("TextButton", {
 			Name = name,
 			BackgroundTransparency = 1,
@@ -2360,7 +2193,6 @@ local function Main()
 		bindAccent(function(color)
 			scroll.ScrollBarImageColor3 = color
 		end)
-
 		button.MouseEnter:Connect(function()
 			if currentTab ~= tab then
 				tween(button, 0.25, {TextColor3 = T.text})
@@ -2375,13 +2207,11 @@ local function Main()
 			playClick(1.05, 0.8)
 			selectTab(tab)
 		end)
-
 		tab.button, tab.page, tab.scroll = button, page, scroll
 		table.insert(tabs, tab)
 		layoutTabs()
 		return tab
 	end
-
 	local function fire(callback, ...)
 		if not callback then return end
 		local ok, err = pcall(callback, ...)
@@ -2389,11 +2219,9 @@ local function Main()
 			notify("Callback error", tostring(err), 5, "error")
 		end
 	end
-
 	local function baseCard(tab, height, name, silent)
 		local c = {}
 		tab.n = tab.n + 1
-
 		local slot = new("Frame", {
 			Size = UDim2.new(1, 0, 0, height),
 			BackgroundTransparency = 1,
@@ -2419,7 +2247,6 @@ local function Main()
 		if tab.capture then
 			table.insert(tab.capture, {slot = slot, frame = card})
 		end
-
 		c.title = new("TextLabel", {
 			Position = UDim2.new(0, 14, 0, 0),
 			Size = UDim2.new(1, -110, 0, math.min(height, 40)),
@@ -2442,7 +2269,6 @@ local function Main()
 			ZIndex = 4,
 			Parent = card,
 		})
-
 		local overlay = new("Frame", {
 			Name = "FX",
 			BackgroundColor3 = accent,
@@ -2476,7 +2302,6 @@ local function Main()
 			overlay.BackgroundColor3 = color
 			sweepGradient.Color = ColorSequence.new(color)
 		end)
-
 		local sweeping = false
 		function c.sweep()
 			if sweeping or not sweepFrame.Parent then return end
@@ -2510,7 +2335,6 @@ local function Main()
 				circle:Destroy()
 			end)
 		end
-
 		c.hit.MouseEnter:Connect(function()
 			tween(card, 0.3, {BackgroundColor3 = T.cardHover})
 			tween(strokeObj, 0.3, {Color = accent, Transparency = 0.35})
@@ -2525,17 +2349,14 @@ local function Main()
 				c.ripple(input.Position.X)
 			end
 		end)
-
 		if not silent then
 			c.hit.MouseButton1Click:Connect(function()
 				playClick()
 			end)
 		end
-
 		table.insert(tab.cards, {frame = card, rest = UDim2.new(), sweep = c.sweep})
 		return c
 	end
-
 	local solidButtons = setmetatable({}, {__mode = "k"})
 	bindAccent(function(color)
 		for b in pairs(solidButtons) do
@@ -2544,7 +2365,6 @@ local function Main()
 			end
 		end
 	end)
-
 	local function smallButton(parent, text, width, solid)
 		local b = new("TextButton", {
 			Size = UDim2.fromOffset(width, 28),
@@ -2585,7 +2405,6 @@ local function Main()
 		end)
 		return b
 	end
-
 	function Tab:Section(text)
 		self.n = self.n + 1
 		local slot = new("Frame", {
@@ -2611,7 +2430,6 @@ local function Main()
 		end)
 		table.insert(self.cards, {frame = label, rest = rest, sweep = function() end})
 	end
-
 	function Tab:Label(text)
 		local c = baseCard(self, 34, "", true)
 		c.title.Size = UDim2.new(1, -28, 1, 0)
@@ -2625,7 +2443,6 @@ local function Main()
 		end
 		return object
 	end
-
 	function Tab:Button(opts)
 		local c = baseCard(self, 40, opts.Name)
 		local arrow = new("TextLabel", {
@@ -2651,7 +2468,6 @@ local function Main()
 			fire(opts.Callback)
 		end)
 	end
-
 	function Tab:Foldout(opts)
 		local c = baseCard(self, 40, opts.Name)
 		local arrow = new("TextLabel", {
@@ -2669,12 +2485,10 @@ local function Main()
 		bindAccent(function(color)
 			arrow.TextColor3 = color
 		end)
-
 		local group = {}
 		self.capture = group
 		fire(opts.Build, self)
 		self.capture = nil
-
 		local open = opts.Open and true or false
 		local function apply(animate)
 			arrow.Text = open and "↑" or "↓"
@@ -2687,12 +2501,10 @@ local function Main()
 			end
 		end
 		apply(false)
-
 		c.hit.MouseButton1Click:Connect(function()
 			open = not open
 			apply(true)
 		end)
-
 		local object = {}
 		function object:Set(value)
 			open = value and true or false
@@ -2703,11 +2515,9 @@ local function Main()
 		end
 		return object
 	end
-
 	function Tab:Toggle(opts)
 		local c = baseCard(self, 40, opts.Name)
 		local on = opts.Default and true or false
-
 		local track = new("Frame", {
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, -12, 0.5, 0),
@@ -2727,7 +2537,6 @@ local function Main()
 			Parent = track,
 		})
 		round(knob)
-
 		local function render(duration, pressed)
 			local kw = pressed and 28 or 22
 			local kx = on and (44 - 2 - kw) or 2
@@ -2740,7 +2549,6 @@ local function Main()
 				track.BackgroundColor3 = accent
 			end
 		end)
-
 		local object = {}
 		function object:Set(value, silent)
 			on = value and true or false
@@ -2763,7 +2571,6 @@ local function Main()
 		end)
 		return object
 	end
-
 	function Tab:Slider(opts)
 		local min, max = opts.Min or 0, opts.Max or 100
 		local step = opts.Step or 1
@@ -2772,7 +2579,6 @@ local function Main()
 		c.title.Size = UDim2.new(1, -100, 0, 32)
 		c.hit.Position = UDim2.new(0, 0, 0, 28)
 		c.hit.Size = UDim2.new(1, 0, 1, -28)
-
 		local valueLabel = new("TextBox", {
 			AnchorPoint = Vector2.new(1, 0),
 			Position = UDim2.new(1, -10, 0, 5),
@@ -2834,7 +2640,6 @@ local function Main()
 			valueLabel.TextColor3 = color
 			knobStroke.Color = color
 		end)
-
 		local value
 		local function setValue(v, silent)
 			v = math.clamp(math.floor(v / step + 0.5) * step, min, max)
@@ -2848,7 +2653,6 @@ local function Main()
 			end
 		end
 		setValue(opts.Default or min, true)
-
 		local function setTyped(v)
 			v = math.max(min, v)
 			v = tonumber(string.format("%.4f", v))
@@ -2876,7 +2680,6 @@ local function Main()
 				valueLabel.Text = string.format("%g", value) .. suffix
 			end
 		end)
-
 		local dragging = false
 		local function updateFromX(x)
 			local a = math.clamp((x - track.AbsolutePosition.X) / math.max(track.AbsoluteSize.X, 1), 0, 1)
@@ -2885,7 +2688,6 @@ local function Main()
 		local dragInput = nil
 		local pending = nil
 		local TOUCH = Enum.UserInputType.Touch
-
 		local function startDrag(input)
 			dragging = true
 			dragInput = input
@@ -2902,7 +2704,6 @@ local function Main()
 			tween(knob, 0.3, {Size = UDim2.fromOffset(14, 14)}, ES.Back, ED.Out)
 			tween(knobStroke, 0.3, {Thickness = 3, Transparency = 0.6})
 		end
-
 		c.hit.InputBegan:Connect(function(input)
 			if not isPress(input) then return end
 			if input.UserInputType == TOUCH then
@@ -2947,7 +2748,6 @@ local function Main()
 				pending = nil
 			end
 		end)
-
 		local object = {}
 		function object:Set(v)
 			setValue(v)
@@ -2957,7 +2757,6 @@ local function Main()
 		end
 		return object
 	end
-
 	function Tab:Dropdown(opts)
 		local options = opts.Options or {}
 		local rowH, headH = 30, 40
@@ -2965,7 +2764,6 @@ local function Main()
 		c.card.ClipsDescendants = true
 		c.hit.Size = UDim2.new(1, 0, 0, headH)
 		c.title.Size = UDim2.new(1, -170, 0, headH)
-
 		local current = opts.Default or options[1]
 		local valueLabel = new("TextLabel", {
 			AnchorPoint = Vector2.new(1, 0),
@@ -2992,7 +2790,6 @@ local function Main()
 			ZIndex = 2,
 			Parent = c.card,
 		})
-
 		local list = new("Frame", {
 			Position = UDim2.new(0, 8, 0, headH),
 			Size = UDim2.new(1, -16, 0, #options * rowH),
@@ -3000,7 +2797,6 @@ local function Main()
 			Parent = c.card,
 		})
 		new("UIListLayout", {SortOrder = Enum.SortOrder.LayoutOrder, Parent = list})
-
 		local buttons = {}
 		local function refresh()
 			for option, button in pairs(buttons) do
@@ -3016,14 +2812,12 @@ local function Main()
 				button.BackgroundColor3 = color
 			end
 		end)
-
 		local open = false
 		local function setOpen(value)
 			open = value
 			tween(c.slot, 0.4, {Size = UDim2.new(1, 0, 0, value and (headH + #options * rowH + 8) or headH)}, ES.Quint, ED.Out)
 			tween(arrow, 0.35, {Rotation = value and 90 or 0}, ES.Back, ED.Out)
 		end
-
 		for index, option in ipairs(options) do
 			local button = new("TextButton", {
 				Size = UDim2.new(1, 0, 0, rowH),
@@ -3056,11 +2850,9 @@ local function Main()
 				setOpen(false)
 			end)
 		end
-
 		c.hit.MouseButton1Click:Connect(function()
 			setOpen(not open)
 		end)
-
 		local object = {}
 		function object:Get()
 			return current
@@ -3075,11 +2867,9 @@ local function Main()
 		end
 		return object
 	end
-
 	function Tab:Input(opts)
 		local c = baseCard(self, 40, opts.Name, true)
 		c.title.Size = UDim2.new(1, -180, 1, 0)
-
 		local box = new("TextBox", {
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, -8, 0.5, 0),
@@ -3112,7 +2902,6 @@ local function Main()
 				fire(opts.Callback, box.Text)
 			end
 		end)
-
 		local object = {}
 		function object:Get()
 			return box.Text
@@ -3122,12 +2911,10 @@ local function Main()
 		end
 		return object
 	end
-
 	function Tab:Keybind(opts)
 		local key = opts.Default or Enum.KeyCode.F
 		local listening = false
 		local c = baseCard(self, 40, opts.Name)
-
 		local button = new("TextButton", {
 			AnchorPoint = Vector2.new(1, 0.5),
 			Position = UDim2.new(1, -8, 0.5, 0),
@@ -3151,14 +2938,12 @@ local function Main()
 		bindAccent(function(color)
 			button.TextColor3 = color
 		end)
-
 		button.MouseButton1Click:Connect(function()
 			playClick(1.05, 0.8)
 			listening = true
 			button.Text = "..."
 			tween(buttonStroke, 0.25, {Color = accent})
 		end)
-
 		connect(UserInputService.InputBegan, function(input, processed)
 			if listening then
 				if input.UserInputType == Enum.UserInputType.Keyboard then
@@ -3174,25 +2959,35 @@ local function Main()
 				fire(opts.Callback, key)
 			end
 		end)
-
 		local object = {}
 		function object:Get()
 			return key
 		end
 		return object
 	end
-
 	local tabTech = addTab("Tech")
 	local tabSettings = addTab("Settings")
-
 	local function buildTech(tab)
 		local techs = {
 			{
-				name = "Lethal",
+				name = "Custom Tech",
+				kind = "custom",
+				anim = "rbxassetid://10503381238",
+				enabled = false,
+				delay = 0.299,
+				jump = 51.2,
+				accuracy = -12,
+				mode = "V1",
+				cancelDelay = 0.4,
+				cancelEnabled = true,
+				noclip = false,
+				range = 8.7,
+			},
+			{
+				name = "Lethal Dash",
 				kind = "lethal",
 				anim = "rbxassetid://12296113986",
 				enabled = false,
-				mode = "V1",
 				delay = 1.65,
 				jump = 60,
 				accuracy = -12,
@@ -3202,7 +2997,7 @@ local function Main()
 				range = 10,
 			},
 			{
-				name = "King",
+				name = "King Tech",
 				kind = "king",
 				anim = "rbxassetid://10503381238",
 				enabled = false,
@@ -3219,7 +3014,7 @@ local function Main()
 				flickBox = true,
 			},
 			{
-				name = "Supa",
+				name = "Supa Tech",
 				anim = "rbxassetid://10503381238",
 				enabled = false,
 				delay = 0.299,
@@ -3229,10 +3024,10 @@ local function Main()
 				cancelEnabled = true,
 				range = 8.3,
 				cancelSwitch = false,
-				accuracyBox = true,
+				accuracyBox = false,
 			},
 			{
-				name = "Twisted",
+				name = "Instant Twisted",
 				kind = "twisted",
 				anim = "rbxassetid://13294471966",
 				enabled = false,
@@ -3249,10 +3044,8 @@ local function Main()
 				twistDelay = 0.08,
 			},
 		}
-
 		local busy = false
 		local activeTech = nil
-
 		local function sendDashInput()
 			local character = LocalPlayer.Character
 			local communicate = character and character:FindFirstChild("Communicate")
@@ -3264,7 +3057,6 @@ local function Main()
 				})
 			end
 		end
-
 		local function resetCharacterState()
 			local character = LocalPlayer.Character
 			if not character then return end
@@ -3283,7 +3075,6 @@ local function Main()
 				end
 			end
 		end
-
 		local function stopMovement()
 			resetCharacterState()
 			local character = LocalPlayer.Character
@@ -3297,7 +3088,6 @@ local function Main()
 				root.AssemblyLinearVelocity = Vector3.zero
 			end
 		end
-
 		local function findNearestTarget(range)
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3321,45 +3111,54 @@ local function Main()
 			end
 			return best
 		end
-
 		local function finish()
 			busy = false
 			activeTech = nil
 		end
-
 		local function activate(tech)
 			if not alive or not tech.enabled or busy then return end
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
 			local humanoid = character and character:FindFirstChild("Humanoid")
 			if not root or not humanoid then return end
-
 			local target = findNearestTarget(tech.range)
 			if not target then
 				resetCharacterState()
 				return
 			end
-
 			busy = true
 			activeTech = tech
-
 			task.wait(math.max(0, tech.delay))
 			if not alive or not tech.enabled or not target.Parent or not root.Parent then
 				finish()
 				resetCharacterState()
 				return
 			end
-
 			local direction = (target.Position - root.Position).Unit
 			local side = Vector3.new(-direction.Z, 0, direction.X)
-
 			humanoid.AutoRotate = false
 			root.CFrame = CFrame.lookAt(root.Position, Vector3.new(target.Position.X, root.Position.Y, target.Position.Z))
 			root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, tech.jump, root.AssemblyLinearVelocity.Z)
 			task.wait(0)
 			sendDashInput()
-
 			local started = os.clock()
+			local customSavedCollision = {}
+			local function applyCustomNoclip()
+				if tech.kind ~= "custom" or not tech.noclip then return end
+				for _, part in ipairs(character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						customSavedCollision[part] = part.CanCollide
+						part.CanCollide = false
+					end
+				end
+			end
+			local function restoreCustomNoclip()
+				for part, original in pairs(customSavedCollision) do
+					if part and part.Parent then pcall(function() part.CanCollide = original end) end
+				end
+				table.clear(customSavedCollision)
+			end
+			applyCustomNoclip()
 			local bavName = "RIzX" .. tech.name .. "BAV"
 			local bav = root:FindFirstChild(bavName) or Instance.new("BodyAngularVelocity")
 			bav.Name = bavName
@@ -3367,30 +3166,27 @@ local function Main()
 			bav.P = 100000
 			bav.AngularVelocity = Vector3.zero
 			bav.Parent = root
-
 			local conn
 			local function stop()
 				if bav then
 					bav:Destroy()
 				end
+				restoreCustomNoclip()
 				stopMovement()
 				finish()
 				if conn then
 					conn:Disconnect()
 				end
 			end
-
 			conn = RunService.Heartbeat:Connect(function()
 				if not alive or not target.Parent or not root.Parent then
 					stop()
 					return
 				end
-
 				humanoid.AutoRotate = false
 				local elapsed = os.clock() - started
 				local targetPos = target.Position
 				local selfPos = root.Position
-
 				local angle = elapsed / 0.45 * (math.pi / 1.5)
 				local progress = math.clamp(elapsed / 0.45, 0, 1)
 				local aim = targetPos + (side * math.cos(angle) + direction * math.sin(angle)) * (tech.accuracy * (1 - progress))
@@ -3399,14 +3195,12 @@ local function Main()
 				if bav and bav.Parent then
 					bav.AngularVelocity = Vector3.new(0, yaw * 30, 0)
 				end
-
 				local flat = (Vector2.new(selfPos.X, selfPos.Z) - Vector2.new(targetPos.X, targetPos.Z)).Magnitude
 				if tech.cancelEnabled and tech.cancelDelay < elapsed and flat < 2.2 or 1.5 < elapsed or not tech.enabled then
 					stop()
 				end
 			end)
 		end
-
 		local LOCK_ANIM = "10479335397"
 		local techLockUntil = 0
 		local techBusy = {}
@@ -3415,7 +3209,6 @@ local function Main()
 		local stickConn = nil
 		local stickToken = 0
 		local kingTweening = false
-
 		local function nearestPlayer()
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3436,7 +3229,6 @@ local function Main()
 			end
 			return bestChar, bestRoot
 		end
-
 		local function nearestLiveHead()
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3468,7 +3260,6 @@ local function Main()
 			end
 			return best
 		end
-
 		local function setHighlight(character)
 			if nearHighlight then
 				pcall(function()
@@ -3493,7 +3284,6 @@ local function Main()
 				end
 			end
 		end
-
 		local function jumpUp(power)
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3501,7 +3291,6 @@ local function Main()
 			local v = root.AssemblyLinearVelocity
 			root.AssemblyLinearVelocity = Vector3.new(v.X, power, v.Z)
 		end
-
 		local function climbToTarget()
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3512,7 +3301,6 @@ local function Main()
 			local v = root.AssemblyLinearVelocity
 			root.AssemblyLinearVelocity = Vector3.new(v.X, math.sqrt(2 * workspace.Gravity * rise), v.Z)
 		end
-
 		local function flipCamera()
 			local camera = workspace.CurrentCamera
 			if not camera then return end
@@ -3524,7 +3312,6 @@ local function Main()
 			local c = math.cos(math.asin(math.clamp(look.Y, -1, 1)))
 			camera.CFrame = CFrame.lookAt(cf.Position, cf.Position + Vector3.new(back.X * c, look.Y, back.Z * c), Vector3.yAxis)
 		end
-
 		local function setCameraLock(on)
 			if cameraLockConn then
 				cameraLockConn:Disconnect()
@@ -3539,7 +3326,6 @@ local function Main()
 				end)
 			end
 		end
-
 		local function stickBehindTarget(seconds)
 			stickToken = stickToken + 1
 			local myToken = stickToken
@@ -3565,7 +3351,6 @@ local function Main()
 				end
 			end)
 		end
-
 		local function autoPosition()
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3574,7 +3359,6 @@ local function Main()
 			local p = targetRoot.Position + -root.CFrame.LookVector * 5
 			root.CFrame = CFrame.new(p.X, root.Position.Y, p.Z)
 		end
-
 		local function kingTween()
 			if kingTweening then return end
 			local character = LocalPlayer.Character
@@ -3598,7 +3382,6 @@ local function Main()
 			end)
 			kingTweening = false
 		end
-
 		local function runGuarded(tech, steps)
 			if not alive or not tech.enabled or techBusy[tech.kind] or os.clock() < techLockUntil then return end
 			techBusy[tech.kind] = true
@@ -3607,13 +3390,10 @@ local function Main()
 			pcall(setHighlight, nil)
 			techBusy[tech.kind] = false
 		end
-
-		-- ===== Noclip lokal (hanya karakter sendiri) =====
 		local Stats = svc("Stats")
 		local Debris = svc("Debris")
 		local noclipOwners = {Lethal = false, Twisted = false}
 		local savedCollision = {}
-
 		local function restoreCollision()
 			for part, original in pairs(savedCollision) do
 				if part and part.Parent then
@@ -3624,7 +3404,6 @@ local function Main()
 				savedCollision[part] = nil
 			end
 		end
-
 		connect(RunService.Stepped, function()
 			if not alive then return end
 			local character = LocalPlayer.Character
@@ -3641,11 +3420,8 @@ local function Main()
 				restoreCollision()
 			end
 		end)
-
-		-- ===== Lethal (dari Supa Suite) =====
 		local lethalToken = 0
 		local lethalCleanup = nil
-
 		local function stopLethal()
 			lethalToken = lethalToken + 1
 			noclipOwners.Lethal = false
@@ -3655,7 +3431,6 @@ local function Main()
 				pcall(fn, false)
 			end
 		end
-
 		local function findLethalTarget(character, root, maxRange)
 			local params = OverlapParams.new()
 			params.FilterType = Enum.RaycastFilterType.Exclude
@@ -3680,7 +3455,6 @@ local function Main()
 			end
 			return target
 		end
-
 		local function activateLethal(tech)
 			if not alive or not tech.enabled or os.clock() < techLockUntil then return end
 			stopLethal()
@@ -3690,12 +3464,10 @@ local function Main()
 			if not root or not humanoid then return end
 			local target = findLethalTarget(character, root, tech.range)
 			if not target then return end
-
 			local sessionToken = lethalToken
 			task.wait(math.max(0, tech.delay))
 			if not alive or sessionToken ~= lethalToken or not tech.enabled or character ~= LocalPlayer.Character then return end
 			if not target.Parent or not root.Parent then return end
-
 			root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, tech.jump, root.AssemblyLinearVelocity.Z)
 			local bodyVelocity = Instance.new("BodyVelocity")
 			bodyVelocity.Name = "RIzXLethalBV"
@@ -3706,10 +3478,8 @@ local function Main()
 			Debris:AddItem(bodyVelocity, 0.1)
 			noclipOwners.Lethal = tech.noclip == true
 			sendDashInput()
-
 			local startTime = os.clock()
 			local flipped = false
-			local mode = tech.mode
 			local offset = target.Position - root.Position
 			if offset.Magnitude < 0.01 then
 				offset = root.CFrame.LookVector
@@ -3717,14 +3487,11 @@ local function Main()
 			local forward = offset.Unit
 			local side = Vector3.new(-forward.Z, 0, forward.X)
 			local angular = nil
-			if mode == "V1" then
-				angular = Instance.new("BodyAngularVelocity")
-				angular.Name = "RIzXLethalBAV"
-				angular.MaxTorque = Vector3.new(0, 1000000, 0)
-				angular.P = 15000
-				angular.Parent = root
-			end
-
+			angular = Instance.new("BodyAngularVelocity")
+			angular.Name = "RIzXLethalBAV"
+			angular.MaxTorque = Vector3.new(0, 1000000, 0)
+			angular.P = 15000
+			angular.Parent = root
 			local connection
 			local function finishSession(forceStop)
 				if connection then
@@ -3743,7 +3510,6 @@ local function Main()
 				end
 			end
 			lethalCleanup = finishSession
-
 			connection = RunService.Heartbeat:Connect(function()
 				if not alive or sessionToken ~= lethalToken or not tech.enabled or not root.Parent or not target.Parent then
 					if lethalCleanup == finishSession then lethalCleanup = nil end
@@ -3752,6 +3518,7 @@ local function Main()
 				end
 				local elapsed = os.clock() - startTime
 				humanoid.AutoRotate = false
+				local mode = tech.kind == "custom" and tech.mode or "V1"
 				if mode == "V1" then
 					local angle = (elapsed / 0.45) * (math.pi / 1.5)
 					local radius = tech.accuracy * (1 - math.clamp(elapsed / 0.45, 0, 1))
@@ -3766,7 +3533,6 @@ local function Main()
 					root.CFrame = root.CFrame * CFrame.Angles(0, math.pi, 0)
 					flipped = true
 				end
-
 				local distanceXZ = (Vector2.new(root.Position.X, root.Position.Z) - Vector2.new(target.Position.X, target.Position.Z)).Magnitude
 				if tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2 then
 					if lethalCleanup == finishSession then lethalCleanup = nil end
@@ -3779,12 +3545,9 @@ local function Main()
 				end
 			end)
 		end
-
-		-- ===== Twisted (dari Supa Suite) =====
 		local twistedToken = 0
 		local twistedTween = nil
 		local twistedHumanoid = nil
-
 		local function cancelTwistedTween()
 			if twistedTween then
 				pcall(function()
@@ -3793,7 +3556,6 @@ local function Main()
 				twistedTween = nil
 			end
 		end
-
 		local function stopTwisted()
 			twistedToken = twistedToken + 1
 			cancelTwistedTween()
@@ -3814,7 +3576,6 @@ local function Main()
 				end
 			end
 		end
-
 		local function getClosestPredictedPosition(maxRange)
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
@@ -3840,7 +3601,6 @@ local function Main()
 			end
 			return bestPosition
 		end
-
 		local function applyTwist(tech, root, humanoid, token)
 			if not alive or not root or not root.Parent or not humanoid or not humanoid.Parent then return end
 			local attachment = Instance.new("Attachment")
@@ -3854,7 +3614,6 @@ local function Main()
 			align.MaxTorque = 1000000
 			align.Responsiveness = 60
 			align.Parent = root
-
 			local forceOff = RunService.Heartbeat:Connect(function()
 				if humanoid and humanoid.Parent then humanoid.AutoRotate = false end
 			end)
@@ -3866,7 +3625,6 @@ local function Main()
 			local function stillValid()
 				return alive and token == twistedToken
 			end
-
 			local ok, err = pcall(function()
 				setAngle(-tech.angle1)
 				task.wait(tech.twistDelay)
@@ -3888,31 +3646,26 @@ local function Main()
 				warn("[RXM] Twist cleanup: " .. tostring(err))
 			end
 		end
-
 		local function activateTwisted(tech)
 			if not alive or not tech.enabled or os.clock() < techLockUntil then return end
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 			if not root or not humanoid then return end
-
 			stopTwisted()
 			local token = twistedToken
 			twistedHumanoid = humanoid
-
 			local targetPosition = getClosestPredictedPosition(tech.range)
 			if targetPosition then
 				humanoid.AutoRotate = false
 				root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
 			end
-
 			if tech.tweenDist > 0 then
 				twistedTween = TweenService:Create(root, TweenInfo.new(math.max(tech.tweenSpeed, 0.05), ES.Cubic, ED.Out), {
 					CFrame = root.CFrame * CFrame.new(0, 0, tech.tweenDist),
 				})
 				twistedTween:Play()
 			end
-
 			noclipOwners.Twisted = tech.noclip == true
 			task.wait(tech.delay)
 			if not alive or token ~= twistedToken or not tech.enabled or character ~= LocalPlayer.Character then
@@ -3931,10 +3684,7 @@ local function Main()
 				twistedHumanoid = nil
 			end
 		end
-
-		local stoppers = {lethal = stopLethal, twisted = stopTwisted}
-
-		-- Bersihkan semua saat GUI di-destroy (dipanggil lewat daftar connections)
+		local stoppers = {custom = stopLethal, lethal = stopLethal, twisted = stopTwisted}
 		table.insert(connections, {
 			Disconnect = function()
 				pcall(stopLethal)
@@ -3944,7 +3694,6 @@ local function Main()
 				restoreCollision()
 			end,
 		})
-
 		local function activateKing(tech)
 			runGuarded(tech, function()
 				task.spawn(kingTween)
@@ -3959,9 +3708,7 @@ local function Main()
 				task.wait(0.2)
 			end)
 		end
-
-		local handlers = {lethal = activateLethal, twisted = activateTwisted, king = activateKing}
-
+		local handlers = {custom = activateLethal, lethal = activateLethal, twisted = activateTwisted, king = activateKing}
 		local function hookCharacter(character)
 			if not alive then return end
 			local humanoid = character:WaitForChild("Humanoid", 5)
@@ -3988,12 +3735,10 @@ local function Main()
 			task.spawn(hookCharacter, LocalPlayer.Character)
 		end
 		connect(LocalPlayer.CharacterAdded, hookCharacter)
-
 		local RANGES = {
 			King = {delay = {0, 1.5, 0.01}, flick = {0, 1, 0.01}},
 			Supa = {delay = {0, 1.5, 0.001}, jump = {0, 120, 0.001}},
 		}
-
 		local function addSlider(tech, field, label, fallback)
 			local range = (RANGES[tech.name] and RANGES[tech.name][field]) or fallback
 			return tab:Slider({
@@ -4007,7 +3752,6 @@ local function Main()
 				end,
 			})
 		end
-
 		for _, tech in ipairs(techs) do
 			tab:Section(tech.name)
 			tab:Toggle({Name = tech.name, Default = tech.enabled, Callback = function(value)
@@ -4019,19 +3763,29 @@ local function Main()
 					stoppers[tech.kind]()
 				end
 			end})
-
 			tab:Foldout({
 				Name = tech.name .. " config",
 				Build = function()
-					if tech.kind == "lethal" then
-						tab:Dropdown({Name = "Mode", Options = {"V1", "V2"}, Default = tech.mode, Callback = function(value)
+					if tech.kind == "custom" then
+						tab:Dropdown({Name = "Custom Tech Mode", Options = {"V1", "V2"}, Default = tech.mode, Callback = function(value)
 							tech.mode = value
-							-- V1 = radius, V2 = waktu flip (sama seperti script asli)
-							tech.accuracy = value == "V2" and 0.25 or 15
-							if tech.accuracySlider then
-								tech.accuracySlider:Set(tech.accuracy)
-							end
+							if value == "V2" and tech.accuracy == 15 then tech.accuracy = 0.25 end
+							if value == "V1" and tech.accuracy == 0.25 then tech.accuracy = 15 end
 						end})
+						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
+						addSlider(tech, "jump", "Jump power", {0, 200, 1})
+						addSlider(tech, "accuracy", "Accuracy", {0, 30, 0.05})
+						addSlider(tech, "cancelDelay", "Cancel delay (s)", {0, 3, 0.01})
+						addSlider(tech, "range", "Target range", {1, 50, 1})
+						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
+							tech.cancelEnabled = value
+						end})
+						tab:Toggle({Name = "Noclip (karakter sendiri)", Default = tech.noclip, Callback = function(value)
+							tech.noclip = value
+						end})
+						return
+					end
+					if tech.kind == "lethal" then
 						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
 						addSlider(tech, "jump", "Vertical velocity", {0, 200, 1})
 						tech.accuracySlider = addSlider(tech, "accuracy", "Accuracy / flip timing", {0.05, 30, 0.05})
@@ -4088,9 +3842,7 @@ local function Main()
 			})
 		end
 	end
-
 	buildTech(tabTech)
-
 	tabSettings:Section("Island")
 	tabSettings:Keybind({Name = "Open / close panel", Default = Enum.KeyCode.K, Callback = function()
 		if hidden then
@@ -4115,7 +3867,6 @@ local function Main()
 			sp.oy.t = math.clamp(panelPos.y, minY, maxY)
 		end
 	end})
-
 	local function destroy()
 		if not alive then return end
 		alive = false
@@ -4128,7 +3879,6 @@ local function Main()
 			gui:Destroy()
 		end)
 	end
-
 	local closing = false
 	local function closeGui()
 		if closing or not alive then return end
@@ -4146,19 +3896,15 @@ local function Main()
 			destroy()
 		end)
 	end
-
 	tabSettings:Button({Name = "Destroy GUI", Callback = closeGui})
-
 	do
 		local t = 0
 		local borderTr, glowI = 0.6, 0.45
 		local lastR, glowColor = -1, accent
-
 		connect(RunService.Heartbeat, function(rawDt)
 			if not alive then return end
 			local dt = math.min(rawDt, 0.05)
 			t = t + dt
-
 			for _, s in pairs(sp) do
 				stepSpring(s, dt)
 			end
@@ -4202,14 +3948,12 @@ local function Main()
 			if hidden and sp.show.x < 0.02 then
 				shell.Visible = false
 			end
-
 			local targetBorder = state == "expanded" and 0.12 or (state == "notify" and 0.28 or 0.6)
 			borderTr = borderTr + (targetBorder - borderTr) * math.min(1, dt * 8)
 			border.Transparency = fx.border and borderTr or 1
 			if fx.border then
 				borderGradient.Rotation = (borderGradient.Rotation + dt * borderSpeed) % 360
 			end
-
 			local speed = math.abs(sp.w.v) + math.abs(sp.h.v) * 2
 			local targetGlow = (state == "expanded" and 0.75 or (state == "notify" and 1 or 0.45))
 				+ math.min(speed / 1400, 0.5) + glowKick
@@ -4225,7 +3969,6 @@ local function Main()
 					glow.frame.BackgroundTransparency = tr
 				end
 			end
-
 			local tintTarget = accent
 			if state == "notify" and currentItem then
 				tintTarget = kindColor(currentItem.kind)
@@ -4241,7 +3984,6 @@ local function Main()
 			if drift > 0.006 then
 				paintBorder(tintColor)
 			end
-
 			if idleG.frame.Visible then
 				local ph = (t * 0.9) % 1
 				idleHalo.Size = UDim2.fromOffset(8 + 14 * ph, 8 + 14 * ph)
@@ -4253,7 +3995,6 @@ local function Main()
 				local p = (t % 3.4) / 2.4
 				idleGradient.Offset = Vector2.new(-1 + 2 * math.min(p, 1), 0)
 			end
-
 			if state == "notify" and currentItem then
 				local item = currentItem
 				if item.live then
@@ -4264,7 +4005,6 @@ local function Main()
 				end
 				notice.ring.Set(ringP)
 			end
-
 			if expG.frame.Visible then
 				if fx.neon then
 					local p = (t * 0.45) % 1.4
@@ -4290,7 +4030,6 @@ local function Main()
 			end
 		end)
 	end
-
 	local api = {}
 	api.Destroy = destroy
 	api.Notify = function(heading, message, duration, kind)
@@ -4332,10 +4071,8 @@ local function Main()
 	if getgenv then
 		getgenv().RXMHUBGUI = api
 	end
-
 	applyFX()
 	selectTab(tabTech)
-
 	local function applyTargets(profile, delayH)
 		local tw, th, tr
 		if state == "idle" then
@@ -4362,7 +4099,6 @@ local function Main()
 			sp.h.t = th
 		end
 	end
-
 	local function scheduleTargets(profile, delay, delayH)
 		morphTok = morphTok + 1
 		local tok = morphTok
@@ -4376,7 +4112,6 @@ local function Main()
 			applyTargets(profile, delayH)
 		end
 	end
-
 	local pillHit = new("TextButton", {
 		Name = "Hit",
 		BackgroundTransparency = 1,
@@ -4386,9 +4121,7 @@ local function Main()
 		ZIndex = 10,
 		Parent = island,
 	})
-
 	local runNotifier
-
 	setState = function(newState)
 		if not alive or state == newState then return end
 		local prev = state
@@ -4396,7 +4129,6 @@ local function Main()
 		hover = false
 		pillHit.Visible = newState ~= "expanded"
 		backdrop.Visible = newState == "expanded"
-
 		if newState == "expanded" then
 			currentItem = nil
 			if prev == "idle" then
@@ -4455,7 +4187,6 @@ local function Main()
 			end)
 		end
 	end
-
 	notify = function(heading, message, duration, kind)
 		if not alive or hidden then return end
 		floatToast({
@@ -4465,7 +4196,6 @@ local function Main()
 			kind = kind or "info",
 		})
 	end
-
 	local hideTok = 0
 	setHidden = function(on)
 		if not alive then return end
@@ -4493,7 +4223,6 @@ local function Main()
 			ringFlash()
 		end
 	end
-
 	pillHit.MouseEnter:Connect(function()
 		hover = true
 		applyTargets()
@@ -4508,14 +4237,12 @@ local function Main()
 		playClick()
 		setState("expanded")
 	end)
-
 	backdrop.MouseButton1Click:Connect(function()
 		if state == "expanded" then
 			playClick()
 			setState("idle")
 		end
 	end)
-
 	do
 		local dragging, dragStart, startOx, startOy = false, nil, 0, 0
 		header.InputBegan:Connect(function(input)
@@ -4540,10 +4267,8 @@ local function Main()
 			end
 		end)
 	end
-
 	applyTargets()
 	selectTab(tabTech)
-
 	applyProfile(PROFILES.pop)
 	sp.w.x, sp.h.x, sp.r.x = 24, 24, 12
 	sp.w.v, sp.h.v = 140, 90
@@ -4553,7 +4278,6 @@ local function Main()
 	idleIntro(0.3)
 	ringFlash()
 end
-
 local introOk = pcall(PlayScreenIntro, Main)
 if not introOk then
 	Main()
