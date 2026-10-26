@@ -5,7 +5,7 @@
 local INTRO_TEXT = "亗 『 R X M H U B 』 🄾🄽 🅃🄾🄿 亗"
 local INTRO_SOUND = "rbxassetid://86045706626808"
 local INTRO_PROFILE = "rbxassetid://72115097738718"
-local INTRO_IMAGE_WAIT = 6
+local INTRO_IMAGE_WAIT = 6.5
 
 local function svc(name)
 	local service = game:GetService(name)
@@ -3202,27 +3202,6 @@ local function Main()
 				range = 10,
 			},
 			{
-				name = "Oreo",
-				kind = "oreo",
-				anim = "rbxassetid://10503381238",
-				enabled = false,
-				delay = 0.3,
-				jump = 50,
-				flick = 0.2,
-				endDelay = 0.15,
-				autoPos = false,
-				accuracy = 0,
-				cancelDelay = 0,
-				cancelEnabled = false,
-				range = 6,
-				cancelSwitch = false,
-				accuracyBox = false,
-				jumpBox = false,
-				flickBox = true,
-				endBox = true,
-				autoPosToggle = true,
-			},
-			{
 				name = "King",
 				kind = "king",
 				anim = "rbxassetid://10503381238",
@@ -3244,13 +3223,13 @@ local function Main()
 				anim = "rbxassetid://10503381238",
 				enabled = false,
 				delay = 0.299,
-				jump = 55.865,
-				accuracy = -0,
+				jump = 36.99,
+				accuracy = 0,
 				cancelDelay = -1,
 				cancelEnabled = true,
 				range = 8.3,
 				cancelSwitch = false,
-				accuracyBox = false,
+				accuracyBox = true,
 			},
 			{
 				name = "Twisted",
@@ -3966,26 +3945,6 @@ local function Main()
 			end,
 		})
 
-		local function activateOreo(tech)
-			runGuarded(tech, function()
-				if tech.autoPos then
-					autoPosition()
-				end
-				task.wait(math.max(0, tech.delay))
-				if not alive or not tech.enabled then return end
-				setHighlight((nearestPlayer()))
-				jumpUp(tech.jump)
-				sendDashInput()
-				task.wait(math.max(0, tech.flick))
-				if not alive then return end
-				setCameraLock(true)
-				climbToTarget()
-				task.wait(math.max(0, tech.endDelay))
-				setCameraLock(false)
-				stickBehindTarget(0.2)
-			end)
-		end
-
 		local function activateKing(tech)
 			runGuarded(tech, function()
 				task.spawn(kingTween)
@@ -4001,7 +3960,7 @@ local function Main()
 			end)
 		end
 
-		local handlers = {lethal = activateLethal, twisted = activateTwisted, oreo = activateOreo, king = activateKing}
+		local handlers = {lethal = activateLethal, twisted = activateTwisted, king = activateKing}
 
 		local function hookCharacter(character)
 			if not alive then return end
@@ -4031,7 +3990,6 @@ local function Main()
 		connect(LocalPlayer.CharacterAdded, hookCharacter)
 
 		local RANGES = {
-			Oreo = {delay = {0, 1.5, 0.01}, jump = {0, 100, 0.5}, flick = {0, 1, 0.01}, endDelay = {0, 1, 0.01}},
 			King = {delay = {0, 1.5, 0.01}, flick = {0, 1, 0.01}},
 			Supa = {delay = {0, 1.5, 0.001}, jump = {0, 120, 0.001}},
 		}
