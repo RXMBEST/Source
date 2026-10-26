@@ -3188,20 +3188,18 @@ local function Main()
 	local function buildTech(tab)
 		local techs = {
 			{
-				name = "Instant Lethal",
+				name = "Lethal",
 				kind = "lethal",
 				anim = "rbxassetid://12296113986",
 				enabled = false,
-				delay = 1.63,
-				jump = 50,
-				flick = 0.23,
-				accuracy = 0,
-				cancelDelay = 0,
-				cancelEnabled = false,
-				range = 6,
-				cancelSwitch = false,
-				accuracyBox = false,
-				flickBox = true,
+				mode = "V1",
+				delay = 1.65,
+				jump = 60,
+				accuracy = -12,
+				cancelDelay = 0.4,
+				cancelEnabled = true,
+				noclip = false,
+				range = 10,
 			},
 			{
 				name = "Oreo",
@@ -3247,12 +3245,29 @@ local function Main()
 				enabled = false,
 				delay = 0.299,
 				jump = 55.865,
-				accuracy = -15,
-				cancelDelay = 0,
+				accuracy = -0,
+				cancelDelay = -1,
 				cancelEnabled = true,
 				range = 8.3,
 				cancelSwitch = false,
 				accuracyBox = false,
+			},
+			{
+				name = "Twisted",
+				kind = "twisted",
+				anim = "rbxassetid://13294471966",
+				enabled = false,
+				delay = 0.22,
+				dashDuration = 0.6,
+				noclip = true,
+				tweenDist = 6,
+				tweenSpeed = 1,
+				range = 10,
+				angle1 = 0,
+				angle2 = 85,
+				angle3 = 179,
+				angle4 = 70,
+				twistDelay = 0.08,
 			},
 		}
 
@@ -3614,20 +3629,342 @@ local function Main()
 			techBusy[tech.kind] = false
 		end
 
+		-- ===== Noclip lokal (hanya karakter sendiri) =====
+		local Stats = svc("Stats")
+		local Debris = svc("Debris")
+		local noclipOwners = {Lethal = false, Twisted = false}
+		local savedCollision = {}
+
+		local function restoreCollision()
+			for part, original in pairs(savedCollision) do
+				if part and part.Parent then
+					pcall(function()
+						part.CanCollide = original
+					end)
+				end
+				savedCollision[part] = nil
+			end
+		end
+
+		connect(RunService.Stepped, function()
+			if not alive then return end
+			local character = LocalPlayer.Character
+			if (noclipOwners.Lethal or noclipOwners.Twisted) and character then
+				for _, item in ipairs(character:GetDescendants()) do
+					if item:IsA("BasePart") then
+						if savedCollision[item] == nil then
+							savedCollision[item] = item.CanCollide
+						end
+						item.CanCollide = false
+					end
+				end
+			else
+				restoreCollision()
+			end
+		end)
+
+		-- ===== Lethal (dari Supa Suite) =====
+		local lethalToken = 0
+		local lethalCleanup = nil
+
+		local function stopLethal()
+			lethalToken = lethalToken + 1
+			noclipOwners.Lethal = false
+			if lethalCleanup then
+				local fn = lethalCleanup
+				lethalCleanup = nil
+				pcall(fn, false)
+			end
+		end
+
+		local function findLethalTarget(character, root, maxRange)
+			local params = OverlapParams.new()
+			params.FilterType = Enum.RaycastFilterType.Exclude
+			params.FilterDescendantsInstances = {character}
+			local ok, parts = pcall(function()
+				return workspace:GetPartBoundsInRadius(root.Position, maxRange, params)
+			end)
+			if not ok then return nil end
+			local target, bestDistance = nil, maxRange
+			for _, part in ipairs(parts) do
+				local model = part:FindFirstAncestorOfClass("Model")
+				local hum = model and model:FindFirstChildOfClass("Humanoid")
+				if model and model ~= character and hum and hum.Health > 0 then
+					local torso = model:FindFirstChild("Torso") or model:FindFirstChild("UpperTorso") or model:FindFirstChild("HumanoidRootPart")
+					if torso then
+						local distance = (root.Position - torso.Position).Magnitude
+						if distance < bestDistance then
+							target, bestDistance = torso, distance
+						end
+					end
+				end
+			end
+			return target
+		end
+
 		local function activateLethal(tech)
-			runGuarded(tech, function()
-				task.wait(math.max(0, tech.delay))
-				if not alive or not tech.enabled then return end
-				jumpUp(tech.jump)
-				sendDashInput()
-				setHighlight((nearestPlayer()))
-				task.wait(math.max(0, tech.flick))
-				if not alive then return end
-				climbToTarget()
-				flipCamera()
-				task.wait(0.2)
+			if not alive or not tech.enabled or os.clock() < techLockUntil then return end
+			stopLethal()
+			local character = LocalPlayer.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if not root or not humanoid then return end
+			local target = findLethalTarget(character, root, tech.range)
+			if not target then return end
+
+			local sessionToken = lethalToken
+			task.wait(math.max(0, tech.delay))
+			if not alive or sessionToken ~= lethalToken or not tech.enabled or character ~= LocalPlayer.Character then return end
+			if not target.Parent or not root.Parent then return end
+
+			root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, tech.jump, root.AssemblyLinearVelocity.Z)
+			local bodyVelocity = Instance.new("BodyVelocity")
+			bodyVelocity.Name = "RIzXLethalBV"
+			bodyVelocity.Velocity = Vector3.new(0, tech.jump, 0)
+			bodyVelocity.MaxForce = Vector3.new(0, 1e8, 0)
+			bodyVelocity.P = 1500
+			bodyVelocity.Parent = root
+			Debris:AddItem(bodyVelocity, 0.1)
+			noclipOwners.Lethal = tech.noclip == true
+			sendDashInput()
+
+			local startTime = os.clock()
+			local flipped = false
+			local mode = tech.mode
+			local offset = target.Position - root.Position
+			if offset.Magnitude < 0.01 then
+				offset = root.CFrame.LookVector
+			end
+			local forward = offset.Unit
+			local side = Vector3.new(-forward.Z, 0, forward.X)
+			local angular = nil
+			if mode == "V1" then
+				angular = Instance.new("BodyAngularVelocity")
+				angular.Name = "RIzXLethalBAV"
+				angular.MaxTorque = Vector3.new(0, 1000000, 0)
+				angular.P = 15000
+				angular.Parent = root
+			end
+
+			local connection
+			local function finishSession(forceStop)
+				if connection then
+					connection:Disconnect()
+					connection = nil
+				end
+				if angular and angular.Parent then angular:Destroy() end
+				angular = nil
+				if bodyVelocity and bodyVelocity.Parent then bodyVelocity:Destroy() end
+				noclipOwners.Lethal = false
+				if humanoid and humanoid.Parent then humanoid.AutoRotate = true end
+				if forceStop then
+					pcall(function()
+						root.AssemblyLinearVelocity = Vector3.zero
+					end)
+				end
+			end
+			lethalCleanup = finishSession
+
+			connection = RunService.Heartbeat:Connect(function()
+				if not alive or sessionToken ~= lethalToken or not tech.enabled or not root.Parent or not target.Parent then
+					if lethalCleanup == finishSession then lethalCleanup = nil end
+					finishSession(false)
+					return
+				end
+				local elapsed = os.clock() - startTime
+				humanoid.AutoRotate = false
+				if mode == "V1" then
+					local angle = (elapsed / 0.45) * (math.pi / 1.5)
+					local radius = tech.accuracy * (1 - math.clamp(elapsed / 0.45, 0, 1))
+					local targetLook = target.Position + (side * math.cos(angle) + forward * math.sin(angle)) * radius
+					local lookCF = CFrame.lookAt(root.Position, Vector3.new(targetLook.X, root.Position.Y, targetLook.Z))
+					local relative = root.CFrame:Inverse() * lookCF
+					local _, y, _ = relative:ToEulerAnglesXYZ()
+					if angular and angular.Parent then
+						angular.AngularVelocity = Vector3.new(0, y * 30, 0)
+					end
+				elseif elapsed >= tech.accuracy and not flipped then
+					root.CFrame = root.CFrame * CFrame.Angles(0, math.pi, 0)
+					flipped = true
+				end
+
+				local distanceXZ = (Vector2.new(root.Position.X, root.Position.Z) - Vector2.new(target.Position.X, target.Position.Z)).Magnitude
+				if tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2 then
+					if lethalCleanup == finishSession then lethalCleanup = nil end
+					finishSession(true)
+					return
+				end
+				if elapsed > 1.5 then
+					if lethalCleanup == finishSession then lethalCleanup = nil end
+					finishSession(false)
+				end
 			end)
 		end
+
+		-- ===== Twisted (dari Supa Suite) =====
+		local twistedToken = 0
+		local twistedTween = nil
+		local twistedHumanoid = nil
+
+		local function cancelTwistedTween()
+			if twistedTween then
+				pcall(function()
+					twistedTween:Cancel()
+				end)
+				twistedTween = nil
+			end
+		end
+
+		local function stopTwisted()
+			twistedToken = twistedToken + 1
+			cancelTwistedTween()
+			noclipOwners.Twisted = false
+			if twistedHumanoid and twistedHumanoid.Parent then
+				twistedHumanoid.AutoRotate = true
+			end
+			twistedHumanoid = nil
+			local character = LocalPlayer.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			if root then
+				for _, object in ipairs(root:GetChildren()) do
+					if object.Name == "RIzXTwistAttachment" or object.Name == "RIzXTwistAlign" then
+						pcall(function()
+							object:Destroy()
+						end)
+					end
+				end
+			end
+		end
+
+		local function getClosestPredictedPosition(maxRange)
+			local character = LocalPlayer.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			if not root then return nil end
+			local bestPosition, bestDistance = nil, maxRange
+			local pingSeconds = 0
+			pcall(function()
+				pingSeconds = math.clamp(Stats.Network.ServerStatsItem["Data Ping"]:GetValue() / 1000, 0, 0.2)
+			end)
+			for _, targetPlayer in ipairs(Players:GetPlayers()) do
+				if targetPlayer ~= LocalPlayer and targetPlayer.Character then
+					local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+					local targetHumanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
+					if targetRoot and targetHumanoid and targetHumanoid.Health > 0 then
+						local distance = (root.Position - targetRoot.Position).Magnitude
+						if distance < bestDistance then
+							bestDistance = distance
+							local velocity = targetRoot.AssemblyLinearVelocity
+							bestPosition = targetRoot.Position + Vector3.new(velocity.X, 0, velocity.Z) * pingSeconds
+						end
+					end
+				end
+			end
+			return bestPosition
+		end
+
+		local function applyTwist(tech, root, humanoid, token)
+			if not alive or not root or not root.Parent or not humanoid or not humanoid.Parent then return end
+			local attachment = Instance.new("Attachment")
+			attachment.Name = "RIzXTwistAttachment"
+			attachment.Parent = root
+			local align = Instance.new("AlignOrientation")
+			align.Name = "RIzXTwistAlign"
+			align.Mode = Enum.OrientationAlignmentMode.OneAttachment
+			align.Attachment0 = attachment
+			align.RigidityEnabled = false
+			align.MaxTorque = 1000000
+			align.Responsiveness = 60
+			align.Parent = root
+
+			local forceOff = RunService.Heartbeat:Connect(function()
+				if humanoid and humanoid.Parent then humanoid.AutoRotate = false end
+			end)
+			local function setAngle(angle)
+				if align and align.Parent and root and root.Parent then
+					align.CFrame = root.CFrame * CFrame.Angles(0, math.rad(angle), 0)
+				end
+			end
+			local function stillValid()
+				return alive and token == twistedToken
+			end
+
+			local ok, err = pcall(function()
+				setAngle(-tech.angle1)
+				task.wait(tech.twistDelay)
+				if not stillValid() then return end
+				setAngle(tech.angle2)
+				task.wait(tech.twistDelay)
+				if not stillValid() then return end
+				setAngle(-tech.angle3)
+				task.wait(tech.twistDelay)
+				if not stillValid() then return end
+				setAngle(tech.angle4)
+				task.wait(math.max(tech.dashDuration - tech.twistDelay * 3, 0))
+			end)
+			forceOff:Disconnect()
+			if align and align.Parent then align:Destroy() end
+			if attachment and attachment.Parent then attachment:Destroy() end
+			if humanoid and humanoid.Parent then humanoid.AutoRotate = true end
+			if not ok then
+				warn("[RXM] Twist cleanup: " .. tostring(err))
+			end
+		end
+
+		local function activateTwisted(tech)
+			if not alive or not tech.enabled or os.clock() < techLockUntil then return end
+			local character = LocalPlayer.Character
+			local root = character and character:FindFirstChild("HumanoidRootPart")
+			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+			if not root or not humanoid then return end
+
+			stopTwisted()
+			local token = twistedToken
+			twistedHumanoid = humanoid
+
+			local targetPosition = getClosestPredictedPosition(tech.range)
+			if targetPosition then
+				humanoid.AutoRotate = false
+				root.CFrame = CFrame.lookAt(root.Position, Vector3.new(targetPosition.X, root.Position.Y, targetPosition.Z))
+			end
+
+			if tech.tweenDist > 0 then
+				twistedTween = TweenService:Create(root, TweenInfo.new(math.max(tech.tweenSpeed, 0.05), ES.Cubic, ED.Out), {
+					CFrame = root.CFrame * CFrame.new(0, 0, tech.tweenDist),
+				})
+				twistedTween:Play()
+			end
+
+			noclipOwners.Twisted = tech.noclip == true
+			task.wait(tech.delay)
+			if not alive or token ~= twistedToken or not tech.enabled or character ~= LocalPlayer.Character then
+				if token == twistedToken then
+					stopTwisted()
+				end
+				return
+			end
+			cancelTwistedTween()
+			sendDashInput()
+			applyTwist(tech, root, humanoid, token)
+			if token ~= twistedToken then return end
+			task.wait(tech.dashDuration)
+			if token == twistedToken then
+				noclipOwners.Twisted = false
+				twistedHumanoid = nil
+			end
+		end
+
+		local stoppers = {lethal = stopLethal, twisted = stopTwisted}
+
+		-- Bersihkan semua saat GUI di-destroy (dipanggil lewat daftar connections)
+		table.insert(connections, {
+			Disconnect = function()
+				pcall(stopLethal)
+				pcall(stopTwisted)
+				noclipOwners.Lethal = false
+				noclipOwners.Twisted = false
+				restoreCollision()
+			end,
+		})
 
 		local function activateOreo(tech)
 			runGuarded(tech, function()
@@ -3664,12 +4001,15 @@ local function Main()
 			end)
 		end
 
-		local handlers = {lethal = activateLethal, oreo = activateOreo, king = activateKing}
+		local handlers = {lethal = activateLethal, twisted = activateTwisted, oreo = activateOreo, king = activateKing}
 
 		local function hookCharacter(character)
 			if not alive then return end
 			local humanoid = character:WaitForChild("Humanoid", 5)
 			if not humanoid or not alive then return end
+			stopLethal()
+			stopTwisted()
+			restoreCollision()
 			connect(humanoid.AnimationPlayed, function(track)
 				if not alive then return end
 				local animation = track.Animation
@@ -3691,7 +4031,6 @@ local function Main()
 		connect(LocalPlayer.CharacterAdded, hookCharacter)
 
 		local RANGES = {
-			["Instant Lethal"] = {delay = {0, 3, 0.01}, jump = {0, 100, 0.5}, flick = {0, 1, 0.01}},
 			Oreo = {delay = {0, 1.5, 0.01}, jump = {0, 100, 0.5}, flick = {0, 1, 0.01}, endDelay = {0, 1, 0.01}},
 			King = {delay = {0, 1.5, 0.01}, flick = {0, 1, 0.01}},
 			Supa = {delay = {0, 1.5, 0.001}, jump = {0, 120, 0.001}},
@@ -3699,7 +4038,7 @@ local function Main()
 
 		local function addSlider(tech, field, label, fallback)
 			local range = (RANGES[tech.name] and RANGES[tech.name][field]) or fallback
-			tab:Slider({
+			return tab:Slider({
 				Name = label,
 				Min = range[1],
 				Max = range[2],
@@ -3718,11 +4057,52 @@ local function Main()
 				if not value and activeTech == tech then
 					stopMovement()
 				end
+				if not value and stoppers[tech.kind] then
+					stoppers[tech.kind]()
+				end
 			end})
 
 			tab:Foldout({
 				Name = tech.name .. " config",
 				Build = function()
+					if tech.kind == "lethal" then
+						tab:Dropdown({Name = "Mode", Options = {"V1", "V2"}, Default = tech.mode, Callback = function(value)
+							tech.mode = value
+							-- V1 = radius, V2 = waktu flip (sama seperti script asli)
+							tech.accuracy = value == "V2" and 0.25 or 15
+							if tech.accuracySlider then
+								tech.accuracySlider:Set(tech.accuracy)
+							end
+						end})
+						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
+						addSlider(tech, "jump", "Vertical velocity", {0, 200, 1})
+						tech.accuracySlider = addSlider(tech, "accuracy", "Accuracy / flip timing", {0.05, 30, 0.05})
+						addSlider(tech, "cancelDelay", "Cancel delay (s)", {0, 3, 0.01})
+						addSlider(tech, "range", "Target range", {1, 50, 1})
+						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
+							tech.cancelEnabled = value
+						end})
+						tab:Toggle({Name = "Noclip (karakter sendiri)", Default = tech.noclip, Callback = function(value)
+							tech.noclip = value
+						end})
+						return
+					end
+					if tech.kind == "twisted" then
+						addSlider(tech, "dashDuration", "Dash duration (s)", {0.1, 5, 0.05})
+						addSlider(tech, "delay", "Dash delay (s)", {0, 5, 0.01})
+						addSlider(tech, "tweenDist", "Tween-back distance", {0, 20, 0.1})
+						addSlider(tech, "tweenSpeed", "Tween speed", {0.05, 5, 0.05})
+						addSlider(tech, "angle1", "Twist angle 1", {0, 360, 1})
+						addSlider(tech, "angle2", "Twist angle 2", {0, 360, 1})
+						addSlider(tech, "angle3", "Twist angle 3", {0, 360, 1})
+						addSlider(tech, "angle4", "Twist angle 4", {0, 360, 1})
+						addSlider(tech, "twistDelay", "Twist interval (s)", {0.01, 0.5, 0.01})
+						addSlider(tech, "range", "Aim range", {1, 100, 1})
+						tab:Toggle({Name = "Noclip (karakter sendiri)", Default = tech.noclip, Callback = function(value)
+							tech.noclip = value
+						end})
+						return
+					end
 					addSlider(tech, "delay", "Delay (s)", {0, 3, 0.01})
 					if tech.jumpBox ~= false then
 						addSlider(tech, "jump", "Jump power", {0, 100, 0.5})
