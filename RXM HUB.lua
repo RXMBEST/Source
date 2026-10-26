@@ -2972,17 +2972,16 @@ local function Main()
 		local techs = {
 			{
 				name = "Custom Tech",
-				kind = "custom",
+				kind = "supa",
 				anim = "rbxassetid://10503381238",
 				enabled = false,
-				delay = 0.299,
-				jump = 40.2,
-				accuracy = -12,
-				mode = "V1",
-				cancelDelay = 0.4,
+				delay = 0.18,
+				jump = 48,
+				accuracy = 6.5,
+				cancelDelay = 0.22,
 				cancelEnabled = true,
 				noclip = false,
-				range = 8.7,
+				range = 12,
 			},
 			{
 				name = "Lethal Dash",
@@ -2990,12 +2989,12 @@ local function Main()
 				anim = "rbxassetid://12296113986",
 				enabled = false,
 				delay = 1.65,
-				jump = 60,
-				accuracy = -12,
-				cancelDelay = 0.4,
-				cancelEnabled = true,
+				jump = 65,
+				accuracy = -14.5,
+				cancelDelay = 0.3,
+				cancelEnabled = false,
 				noclip = false,
-				range = 10,
+				range = 6,
 			},
 			{
 				name = "King Tech",
@@ -3145,7 +3144,7 @@ local function Main()
 			local started = os.clock()
 			local customSavedCollision = {}
 			local function applyCustomNoclip()
-				if tech.kind ~= "custom" or not tech.noclip then return end
+				if tech.name ~= "Custom Tech" or not tech.noclip then return end
 				for _, part in ipairs(character:GetDescendants()) do
 					if part:IsA("BasePart") then
 						customSavedCollision[part] = part.CanCollide
@@ -3456,96 +3455,76 @@ local function Main()
 			end
 			return target
 		end
+		local lethalRunning = false
 		local function activateLethal(tech)
-			if not alive or not tech.enabled or os.clock() < techLockUntil then return end
-			stopLethal()
+			if not alive or not tech.enabled or lethalRunning or os.clock() < techLockUntil then return end
 			local character = LocalPlayer.Character
 			local root = character and character:FindFirstChild("HumanoidRootPart")
 			local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 			if not root or not humanoid then return end
 			local target = findLethalTarget(character, root, tech.range)
-			if not target then return end
+			if not target then
+				humanoid.AutoRotate = true
+				return
+			end
+			lethalRunning = true
 			local sessionToken = lethalToken
 			task.wait(math.max(0, tech.delay))
-			if not alive or sessionToken ~= lethalToken or not tech.enabled or character ~= LocalPlayer.Character then return end
-			if not target.Parent or not root.Parent then return end
-			root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, tech.jump, root.AssemblyLinearVelocity.Z)
-			local bodyVelocity = Instance.new("BodyVelocity")
-			bodyVelocity.Name = "RIzXLethalBV"
-			bodyVelocity.Velocity = Vector3.new(0, tech.jump, 0)
-			bodyVelocity.MaxForce = Vector3.new(0, 1e8, 0)
-			bodyVelocity.P = 1500
-			bodyVelocity.Parent = root
-			Debris:AddItem(bodyVelocity, 0.1)
-			noclipOwners.Lethal = tech.noclip == true
-			sendDashInput()
-			local startTime = os.clock()
-			local flipped = false
-			local offset = target.Position - root.Position
-			if offset.Magnitude < 0.01 then
-				offset = root.CFrame.LookVector
+			if not alive or sessionToken ~= lethalToken or not tech.enabled or character ~= LocalPlayer.Character or not target.Parent or not root.Parent then
+				lethalRunning = false
+				return
 			end
+			local offset = target.Position - root.Position
+			if offset.Magnitude < 0.001 then offset = root.CFrame.LookVector end
 			local forward = offset.Unit
 			local side = Vector3.new(-forward.Z, 0, forward.X)
-			local angular = nil
-			angular = Instance.new("BodyAngularVelocity")
+			humanoid.AutoRotate = false
+			root.CFrame = CFrame.lookAt(root.Position, Vector3.new(target.Position.X, root.Position.Y, target.Position.Z))
+			root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, tech.jump, root.AssemblyLinearVelocity.Z)
+			noclipOwners.Lethal = tech.noclip == true
+			task.wait(0)
+			sendDashInput()
+			local started = os.clock()
+			local angular = root:FindFirstChild("RIzXLethalBAV") or Instance.new("BodyAngularVelocity")
 			angular.Name = "RIzXLethalBAV"
-			angular.MaxTorque = Vector3.new(0, 1000000, 0)
-			angular.P = 15000
+			angular.MaxTorque = Vector3.new(0, math.huge, 0)
+			angular.P = 100000
+			angular.AngularVelocity = Vector3.zero
 			angular.Parent = root
 			local connection
-			local function finishSession(forceStop)
-				if connection then
-					connection:Disconnect()
-					connection = nil
-				end
+			local finished = false
+			local function finishSession(clearVelocity)
+				if finished then return end
+				finished = true
+				if connection then connection:Disconnect(); connection = nil end
 				if angular and angular.Parent then angular:Destroy() end
-				angular = nil
-				if bodyVelocity and bodyVelocity.Parent then bodyVelocity:Destroy() end
 				noclipOwners.Lethal = false
 				if humanoid and humanoid.Parent then humanoid.AutoRotate = true end
-				if forceStop then
-					pcall(function()
-						root.AssemblyLinearVelocity = Vector3.zero
-					end)
-				end
+				if clearVelocity and root and root.Parent then root.AssemblyLinearVelocity = Vector3.zero end
+				if lethalCleanup == finishSession then lethalCleanup = nil end
+				lethalRunning = false
 			end
 			lethalCleanup = finishSession
 			connection = RunService.Heartbeat:Connect(function()
-				if not alive or sessionToken ~= lethalToken or not tech.enabled or not root.Parent or not target.Parent then
-					if lethalCleanup == finishSession then lethalCleanup = nil end
+				if not alive or sessionToken ~= lethalToken or not tech.enabled or not root.Parent or not target.Parent or character ~= LocalPlayer.Character then
 					finishSession(false)
 					return
 				end
-				local elapsed = os.clock() - startTime
+				local elapsed = os.clock() - started
 				humanoid.AutoRotate = false
-				local mode = tech.kind == "custom" and tech.mode or "V1"
-				if mode == "V1" then
-					local angle = (elapsed / 0.45) * (math.pi / 1.5)
-					local radius = tech.accuracy * (1 - math.clamp(elapsed / 0.45, 0, 1))
-					local targetLook = target.Position + (side * math.cos(angle) + forward * math.sin(angle)) * radius
-					local lookCF = CFrame.lookAt(root.Position, Vector3.new(targetLook.X, root.Position.Y, targetLook.Z))
-					local relative = root.CFrame:Inverse() * lookCF
-					local _, y, _ = relative:ToEulerAnglesXYZ()
-					if angular and angular.Parent then
-						angular.AngularVelocity = Vector3.new(0, y * 30, 0)
-					end
-				elseif elapsed >= tech.accuracy and not flipped then
-					root.CFrame = root.CFrame * CFrame.Angles(0, math.pi, 0)
-					flipped = true
-				end
+				local angle = (elapsed / 0.45) * (math.pi / 1.5)
+				local fade = math.clamp(elapsed / 0.45, 0, 1)
+				local targetLook = target.Position + (side * math.cos(angle) + forward * math.sin(angle)) * (tech.accuracy * (1 - fade))
+				local lookCF = CFrame.lookAt(root.Position, Vector3.new(targetLook.X, root.Position.Y, targetLook.Z))
+				local _, yaw, _ = (root.CFrame:Inverse() * lookCF):ToEulerAnglesXYZ()
+				if angular and angular.Parent then angular.AngularVelocity = Vector3.new(0, yaw * 30, 0) end
 				local distanceXZ = (Vector2.new(root.Position.X, root.Position.Z) - Vector2.new(target.Position.X, target.Position.Z)).Magnitude
-				if tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2 then
-					if lethalCleanup == finishSession then lethalCleanup = nil end
-					finishSession(true)
-					return
-				end
-				if elapsed > 1.5 then
-					if lethalCleanup == finishSession then lethalCleanup = nil end
-					finishSession(false)
+				if (tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2) or elapsed > 1.5 or not tech.enabled then
+					finishSession(tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2)
 				end
 			end)
 		end
+
 		local twistedToken = 0
 		local twistedTween = nil
 		local twistedHumanoid = nil
@@ -3767,12 +3746,7 @@ local function Main()
 			tab:Foldout({
 				Name = tech.name .. " config",
 				Build = function()
-					if tech.kind == "custom" then
-						tab:Dropdown({Name = "Custom Tech Mode", Options = {"V1", "V2"}, Default = tech.mode, Callback = function(value)
-							tech.mode = value
-							if value == "V2" and tech.accuracy == 15 then tech.accuracy = 0.25 end
-							if value == "V1" and tech.accuracy == 0.25 then tech.accuracy = 15 end
-						end})
+					if tech.name == "Custom Tech" then
 						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
 						addSlider(tech, "jump", "Jump power", {0, 200, 1})
 						addSlider(tech, "accuracy", "Accuracy", {0, 30, 0.05})
@@ -3781,7 +3755,7 @@ local function Main()
 						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
 							tech.cancelEnabled = value
 						end})
-						tab:Toggle({Name = "Noclip (karakter sendiri)", Default = tech.noclip, Callback = function(value)
+						tab:Toggle({Name = "Noclip", Default = tech.noclip, Callback = function(value)
 							tech.noclip = value
 						end})
 						return
@@ -3789,13 +3763,13 @@ local function Main()
 					if tech.kind == "lethal" then
 						addSlider(tech, "delay", "Activation delay (s)", {0, 5, 0.01})
 						addSlider(tech, "jump", "Vertical velocity", {0, 200, 1})
-						tech.accuracySlider = addSlider(tech, "accuracy", "Accuracy / flip timing", {0.05, 30, 0.05})
+						tech.accuracySlider = addSlider(tech, "accuracy", "Lethal accuracy", {-30, 30, 0.05})
 						addSlider(tech, "cancelDelay", "Cancel delay (s)", {0, 3, 0.01})
 						addSlider(tech, "range", "Target range", {1, 50, 1})
 						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
 							tech.cancelEnabled = value
 						end})
-						tab:Toggle({Name = "Noclip (karakter sendiri)", Default = tech.noclip, Callback = function(value)
+						tab:Toggle({Name = "Noclip", Default = tech.noclip, Callback = function(value)
 							tech.noclip = value
 						end})
 						return
@@ -3811,7 +3785,7 @@ local function Main()
 						addSlider(tech, "angle4", "Twist angle 4", {0, 360, 1})
 						addSlider(tech, "twistDelay", "Twist interval (s)", {0.01, 0.5, 0.01})
 						addSlider(tech, "range", "Aim range", {1, 100, 1})
-						tab:Toggle({Name = "Noclip (karakter sendiri)", Default = tech.noclip, Callback = function(value)
+						tab:Toggle({Name = "Noclip", Default = tech.noclip, Callback = function(value)
 							tech.noclip = value
 						end})
 						return
@@ -3844,74 +3818,330 @@ local function Main()
 		end
 	end
 	buildTech(tabTech)
-	tabMisc:Section("Anti Lag")
+
+	-- Services used by Visual Pack and Anti Lag must be declared before either feature.
 	local WorkspaceService = svc("Workspace")
 	local LightingService = svc("Lighting")
-	local particleSaved = setmetatable({}, {__mode = "k"})
-	local shadowSaved = setmetatable({}, {__mode = "k"})
-	local particleConnection
-	local function isParticleEffect(obj)
-		return obj:IsA("ParticleEmitter") or obj:IsA("Trail") or obj:IsA("Beam") or obj:IsA("Smoke") or obj:IsA("Fire") or obj:IsA("Sparkles")
+	local ReplicatedStorageService = svc("ReplicatedStorage")
+
+	-- TSB VISUAL PACK — AI TRAP EDITION (integrated into RXM HUB; no extra GUI)
+	tabMisc:Section("TSB Visual Pack")
+	local visualPackEnabled = false
+	local visualPackConnections = {}
+	local visualSkyIds = {
+		Bk = 92959017845968, Ft = 129304841254693, Lf = 129249062260004,
+		Rt = 117319232583147, Up = 121193772599100, Dn = 115022734343595,
+	}
+	local visualOldLighting, visualOldSky, visualOldAtmosphere, visualOldClouds
+	local visualOldEffects = {}
+	local visualOldHeroEffects = {}
+	local visualApplying = false
+	local visualTerrain = WorkspaceService:FindFirstChildOfClass("Terrain")
+
+	local function disconnectVisualPack()
+		for _, connection in ipairs(visualPackConnections) do pcall(function() connection:Disconnect() end) end
+		table.clear(visualPackConnections)
 	end
-	local function setParticlesLow(obj, enabled)
-		if not isParticleEffect(obj) then return end
+
+	local function visualSafeConnect(signal, callback)
+		local ok, connection = pcall(function() return signal:Connect(callback) end)
+		if ok and connection then table.insert(visualPackConnections, connection) end
+	end
+
+	local function applyHeroHunterEffect(object)
+		if not object or not (object:IsA("Trail") or object:IsA("ParticleEmitter")) then return end
+		if not visualOldHeroEffects[object] then
+			visualOldHeroEffects[object] = {Color = object.Color, Texture = object:IsA("Trail") and object.Texture or nil, LightEmission = object.LightEmission}
+		end
+		pcall(function()
+			object.Color = ColorSequence.new(Color3.fromRGB(0, 85, 190))
+			if object:IsA("Trail") then object.Texture = "" end
+			object.LightEmission = object:IsA("Trail") and 0.8 or 0.75
+		end)
+	end
+
+	local function applyVisualPack()
+		if not visualPackEnabled or visualApplying then return end
+		visualApplying = true
+		pcall(function()
+			LightingService.ClockTime = 12
+			LightingService.GlobalShadows = false
+			LightingService.Brightness = 0.8
+			LightingService.ExposureCompensation = -0.2
+			LightingService.FogStart, LightingService.FogEnd = 9e9, 9e9
+			local sky = LightingService:FindFirstChildOfClass("Sky")
+			if not sky then sky = Instance.new("Sky"); sky.Name = "RXM_TSB_VisualSky"; sky.Parent = LightingService end
+			for key, assetId in pairs(visualSkyIds) do sky["Skybox" .. key] = "rbxassetid://" .. tostring(assetId) end
+			sky.SunAngularSize, sky.SunTextureId, sky.MoonAngularSize, sky.MoonTextureId = 0, "", 0, ""
+			for _, effect in ipairs(LightingService:GetChildren()) do
+				if effect:IsA("Atmosphere") then effect.Density, effect.Haze, effect.Glare = 0, 0, 0
+				elseif effect:IsA("PostEffect") or effect:IsA("SunRaysEffect") then effect.Enabled = false end
+			end
+			if visualTerrain then
+				for _, cloud in ipairs(visualTerrain:GetChildren()) do if cloud:IsA("Clouds") then cloud.Enabled = false end end
+			end
+			local function hookCharacter(character)
+				for _, object in ipairs(character:GetDescendants()) do
+					if object:IsA("Trail") or object:IsA("ParticleEmitter") then applyHeroHunterEffect(object) end
+				end
+				visualSafeConnect(character.DescendantAdded, function(object)
+					if visualPackEnabled and (object:IsA("Trail") or object:IsA("ParticleEmitter")) then applyHeroHunterEffect(object) end
+				end)
+			end
+			if LocalPlayer.Character then hookCharacter(LocalPlayer.Character) end
+		end)
+		visualApplying = false
+	end
+
+	local function enableVisualPack(enabled)
+		if visualPackEnabled == enabled then return end
+		visualPackEnabled = enabled
 		if enabled then
-			if particleSaved[obj] == nil then particleSaved[obj] = obj.Enabled end
-			obj.Enabled = false
-		elseif particleSaved[obj] ~= nil then
-			pcall(function() obj.Enabled = particleSaved[obj] end)
-			particleSaved[obj] = nil
+			visualOldLighting = {ClockTime = LightingService.ClockTime, Brightness = LightingService.Brightness, ExposureCompensation = LightingService.ExposureCompensation, GlobalShadows = LightingService.GlobalShadows, FogStart = LightingService.FogStart, FogEnd = LightingService.FogEnd}
+			local oldSky = LightingService:FindFirstChildOfClass("Sky")
+			visualOldSky = oldSky and oldSky:Clone() or nil
+			visualOldAtmosphere, visualOldEffects, visualOldHeroEffects = {}, {}, {}
+			for _, object in ipairs(LightingService:GetChildren()) do
+				if object:IsA("Atmosphere") then visualOldAtmosphere[object] = {Density=object.Density, Haze=object.Haze, Glare=object.Glare}
+				elseif object:IsA("PostEffect") or object:IsA("SunRaysEffect") then visualOldEffects[object] = object.Enabled end
+			end
+			visualOldClouds = {}
+			if visualTerrain then for _, cloud in ipairs(visualTerrain:GetChildren()) do if cloud:IsA("Clouds") then visualOldClouds[cloud] = cloud.Enabled end end end
+			applyVisualPack()
+			visualSafeConnect(LocalPlayer.CharacterAdded, function(character) task.wait(0.6); if visualPackEnabled then applyVisualPack() end end)
+			visualSafeConnect(LightingService.ChildAdded, function(child)
+				if not visualPackEnabled then return end
+				if child:IsA("Sky") or child:IsA("Atmosphere") then task.defer(applyVisualPack) end
+			end)
+			if visualTerrain then visualSafeConnect(visualTerrain.ChildAdded, function(child) if visualPackEnabled and child:IsA("Clouds") then child.Enabled = false end end) end
+		else
+			disconnectVisualPack()
+			pcall(function()
+				if visualOldLighting then for key, value in pairs(visualOldLighting) do LightingService[key] = value end end
+				local currentSky = LightingService:FindFirstChildOfClass("Sky"); if currentSky then currentSky:Destroy() end
+				if visualOldSky then visualOldSky:Clone().Parent = LightingService end
+				for object, values in pairs(visualOldAtmosphere or {}) do if object and object.Parent then for key, value in pairs(values) do object[key] = value end end end
+				for object, wasEnabled in pairs(visualOldEffects or {}) do if object and object.Parent then object.Enabled = wasEnabled end end
+				for cloud, wasEnabled in pairs(visualOldClouds or {}) do if cloud and cloud.Parent then cloud.Enabled = wasEnabled end end
+				for object, values in pairs(visualOldHeroEffects or {}) do if object and object.Parent then pcall(function() object.Color = values.Color; if object:IsA("Trail") then object.Texture = values.Texture end; object.LightEmission = values.LightEmission end) end end
+			end)
+			visualOldLighting, visualOldSky, visualOldAtmosphere, visualOldClouds, visualOldEffects, visualOldHeroEffects = nil, nil, nil, nil, {}, {}
 		end
 	end
-	tabMisc:Toggle({Name = "Disable particles / effects", Default = false, Callback = function(enabled)
+	tabMisc:Toggle({Name = "TSB VISUAL PACK (AI TRAP / NO SUN)", Default = false, Callback = enableVisualPack})
+
+	tabMisc:Section("Anti Lag")
+	local performanceEnabled = false
+	local ultraPreferenceEnabled = false
+	local superAntiLagEnabled = false
+	local miscPersistentConnections = {}
+	local maxPerformanceStepConnection
+	local ultraPreferenceConnection
+	local superAntiLagConnections = {}
+	local superSavedEnabled = {}
+	local superSavedCastShadow = {}
+	local superOldGlobalShadows
+	local effectClasses = {
+		ParticleEmitter = true, Trail = true, Beam = true,
+		Fire = true, Smoke = true, Sparkles = true,
+	}
+
+	local function keepMiscConnection(signal, callback, bucket)
+		local connection = signal:Connect(callback)
+		table.insert(bucket or miscPersistentConnections, connection)
+		return connection
+	end
+	local function disconnectMiscList(list)
+		for i = #list, 1, -1 do
+			local connection = list[i]
+			pcall(function() if connection then connection:Disconnect() end end)
+			list[i] = nil
+		end
+	end
+	local function removeNamedChildren(root, token)
+		if not root then return end
+		for _, child in ipairs(root:GetChildren()) do
+			if string.find(string.lower(child.Name), string.lower(token), 1, true) then
+				pcall(function() child:Destroy() end)
+			else
+				removeNamedChildren(child, token)
+			end
+		end
+	end
+	local function removeNamedNewChild(root, token)
+		keepMiscConnection(root.ChildAdded, function(child)
+			if performanceEnabled and string.find(string.lower(child.Name), string.lower(token), 1, true) then
+				pcall(function() child:Destroy() end)
+			end
+		end)
+	end
+	-- Keep the original script's automatic cleanup for newly added Effect/MeshPart objects.
+	removeNamedNewChild(WorkspaceService, "Effect")
+	removeNamedNewChild(ReplicatedStorageService, "Effect")
+	removeNamedNewChild(WorkspaceService, "MeshPart")
+	removeNamedNewChild(ReplicatedStorageService, "MeshPart")
+
+	tabMisc:Toggle({Name = "MAX PERFORMANCE", Default = false, Callback = function(enabled)
+		local ok, err = pcall(function()
+			performanceEnabled = enabled
+			if enabled then
+				removeNamedChildren(WorkspaceService, "Effect")
+				removeNamedChildren(ReplicatedStorageService, "Effect")
+				removeNamedChildren(WorkspaceService, "MeshPart")
+				removeNamedChildren(ReplicatedStorageService, "MeshPart")
+				if maxPerformanceStepConnection then maxPerformanceStepConnection:Disconnect(); maxPerformanceStepConnection = nil end
+				maxPerformanceStepConnection = RunService.Stepped:Connect(function()
+					if not performanceEnabled then return end
+					pcall(function()
+						local thrown = WorkspaceService:FindFirstChild("Thrown")
+						if thrown then
+							for _, object in ipairs(thrown:GetChildren()) do
+								if object and object.Parent and object.Name ~= "Dragon" and object.Name ~= "Aurora" and object.Name ~= "starterdeb" then object:Destroy() end
+							end
+						end
+					end)
+				end)
+				LightingService.GlobalShadows = false
+				if type(setfpscap) == "function" then pcall(function() setfpscap(144) end) end
+			else
+				if maxPerformanceStepConnection then maxPerformanceStepConnection:Disconnect(); maxPerformanceStepConnection = nil end
+				LightingService.GlobalShadows = superAntiLagEnabled and false or true
+			end
+		end)
+		if not ok then warn("[RXM HUB] MAX PERFORMANCE error: " .. tostring(err)) end
+	end})
+
+	local ultraKeepParticleNames = {
+		"Shockwave2", "Shockwave", "PunchingWind", "landRays", "ohye",
+		"DragWind", "Maybe", "ItsWindTime", "STuff", "Land", "Wind2",
+		"Combine", "pls", "omggg", "MainWave", "TParticles2", "Lightning",
+		"BROO3", "BROO2", "BROO5", "Impact", "TBottom", "Skull", "BROO",
+	}
+	local function isUltraKeepParticle(name)
+		for _, keptName in ipairs(ultraKeepParticleNames) do
+			if name == keptName then return true end
+		end
+		return false
+	end
+	local function removeUltraPreferenceResources()
+		local resources = ReplicatedStorageService:FindFirstChild("Resources")
+		if not resources then return end
+		local legacyReplication = resources:FindFirstChild("LegacyReplication")
+		if legacyReplication then
+			local hunterUlt = legacyReplication:FindFirstChild("HunterUlt")
+			local attachment = hunterUlt and hunterUlt:FindFirstChild("Attachment1")
+			if attachment then
+				for _, name in ipairs({"6", "4-4", "4-3", "4-2", "4"}) do
+					local object = attachment:FindFirstChild(name)
+					if object then object:Destroy() end
+				end
+			end
+			for _, name in ipairs({"UpSmoke2", "UpSmoke", "TreeFire", "Trans", "SmokeOne", "Smoke", "Leaves", "ImpactGlow", "Effect", "BackSmoke", "Push"}) do
+				local object = legacyReplication:FindFirstChild(name)
+				if object then object:Destroy() end
+			end
+		end
+		for _, name in ipairs({
+			"HeadFirst", "FlyingKicks", "WhirlwindDrop", "VanishingKick", "FlashFinisher", "PurpleAura", "PurpleM1",
+			"le phone", "eject (2)", "Windy", "WindPurp", "Splash", "Slam", "Rocks", "Rock", "PhonePhysicsTest",
+			"NewSlash", "Mah", "Katana", "FirstHit", "FinalEffects", "FSExpl", "EmergeSword", "CyborgArms",
+			"Clone_Rig", "CloneRigEm", "CloneRig", "BatBarrageEffects", "AuraHolder", "AtomicFX", "Afterimage",
+			"AcidExplosion", "QuickSlash", "MonsterSmash", "MonsterMoveTest", "MonsterAwaken", "FiveSeasonsFX",
+			"FinisherEmerge", "FirstUltimateMoveMech", "FirstMonsterVFX", "DogVariant", "DeadlySliceVfx",
+			"Consecutive Punches Finisher", "Slap", "SecM1", "Fast", "Fang", "EsperAwakening", "EffectsMech",
+			"DragonUppercut", "DownSlam", "DoomFinish", "CrushingPushFinisher", "DashMechVfx", "Bossfight", "allvfx",
+			"AtomicSlash", "CrushingPull", "GreenLights", "GreenTornado", "HeadFirstFinisher", "Collat", "Chain", "Cannon",
+			"StoicBomb", "Meteor", "MechVfx", "CrabSlash", "CrabBeam", "Brother", "Blackholevfx", "BarrageFinisher",
+		}) do
+			local object = resources:FindFirstChild(name)
+			if object then object:Destroy() end
+		end
+	end
+	local function removeUltraParticles(root)
+		if not root then return end
+		local resources = ReplicatedStorageService:FindFirstChild("Resources")
+		local smoke = resources and resources:FindFirstChild("Smoke")
+		for _, object in ipairs(root:GetDescendants()) do
+			if object:IsA("ParticleEmitter") and not isUltraKeepParticle(object.Name) and not (smoke and object:IsDescendantOf(smoke)) then
+				pcall(function() object:Destroy() end)
+			end
+		end
+	end
+	tabMisc:Toggle({Name = "ULTRA MAX PREFERENCE", Default = false, Callback = function(enabled)
+		ultraPreferenceEnabled = enabled
 		if enabled then
-			for _, obj in ipairs(WorkspaceService:GetDescendants()) do pcall(setParticlesLow, obj, true) end
-			if particleConnection then particleConnection:Disconnect() end
-			particleConnection = WorkspaceService.DescendantAdded:Connect(function(obj)
-				if enabled then task.defer(function() pcall(setParticlesLow, obj, true) end) end
+			removeUltraPreferenceResources()
+			removeUltraParticles(WorkspaceService)
+			if ultraPreferenceConnection then ultraPreferenceConnection:Disconnect() end
+			ultraPreferenceConnection = game.DescendantAdded:Connect(function(object)
+				if ultraPreferenceEnabled and object:IsA("ParticleEmitter") and not isUltraKeepParticle(object.Name) then
+					local resources = ReplicatedStorageService:FindFirstChild("Resources")
+					local smoke = resources and resources:FindFirstChild("Smoke")
+					if not (smoke and object:IsDescendantOf(smoke)) then pcall(function() object:Destroy() end) end
+				end
 			end)
 		else
-			if particleConnection then particleConnection:Disconnect(); particleConnection = nil end
-			for obj, value in pairs(particleSaved) do
-				pcall(function() if obj.Parent then obj.Enabled = value end end)
-				particleSaved[obj] = nil
-			end
+			if ultraPreferenceConnection then ultraPreferenceConnection:Disconnect(); ultraPreferenceConnection = nil end
 		end
 	end})
-	tabMisc:Toggle({Name = "Disable shadows", Default = false, Callback = function(enabled)
+
+	local function applySuperAntiLagObject(object)
+		if not superAntiLagEnabled or not object then return end
+		pcall(function()
+			if effectClasses[object.ClassName] and superSavedEnabled[object] == nil then
+				superSavedEnabled[object] = object.Enabled
+				object.Enabled = false
+			end
+			if object:IsA("BasePart") and superSavedCastShadow[object] == nil then
+				superSavedCastShadow[object] = object.CastShadow
+				object.CastShadow = false
+			end
+		end)
+	end
+	local function scanSuperAntiLag(root)
+		if root then for _, object in ipairs(root:GetDescendants()) do applySuperAntiLagObject(object) end end
+	end
+	local function setSuperAntiLag(enabled)
+		if superAntiLagEnabled == enabled then return end
+		superAntiLagEnabled = enabled
 		if enabled then
-			if shadowSaved.global == nil then shadowSaved.global = LightingService.GlobalShadows end
+			superSavedEnabled, superSavedCastShadow = {}, {}
+			superOldGlobalShadows = LightingService.GlobalShadows
 			LightingService.GlobalShadows = false
-			for _, obj in ipairs(WorkspaceService:GetDescendants()) do
-				if obj:IsA("BasePart") then
-					if shadowSaved[obj] == nil then shadowSaved[obj] = obj.CastShadow end
-					obj.CastShadow = false
-				end
-			end
+			scanSuperAntiLag(WorkspaceService)
+			scanSuperAntiLag(LocalPlayer.Character)
+			scanSuperAntiLag(LocalPlayer:FindFirstChild("Backpack"))
+			table.insert(superAntiLagConnections, WorkspaceService.DescendantAdded:Connect(applySuperAntiLagObject))
+			local backpack = LocalPlayer:FindFirstChild("Backpack")
+			if backpack then table.insert(superAntiLagConnections, backpack.DescendantAdded:Connect(applySuperAntiLagObject)) end
+			table.insert(superAntiLagConnections, LocalPlayer.CharacterAdded:Connect(function(character)
+				task.defer(function() if superAntiLagEnabled then scanSuperAntiLag(character) end end)
+			end))
 		else
-			if shadowSaved.global ~= nil then LightingService.GlobalShadows = shadowSaved.global; shadowSaved.global = nil end
-			for obj, value in pairs(shadowSaved) do
-				if typeof(obj) == "Instance" then pcall(function() if obj.Parent then obj.CastShadow = value end end); shadowSaved[obj] = nil end
+			disconnectMiscList(superAntiLagConnections)
+			for object, wasEnabled in pairs(superSavedEnabled) do
+				if object and object.Parent then pcall(function() object.Enabled = wasEnabled end) end
 			end
-		end
-	end})
-	tabMisc:Toggle({Name = "Hide textures / decals", Default = false, Callback = function(enabled)
-		for _, obj in ipairs(WorkspaceService:GetDescendants()) do
-			if obj:IsA("Decal") or obj:IsA("Texture") then
-				if enabled then
-					if particleSaved[obj] == nil then particleSaved[obj] = obj.Transparency end
-					obj.Transparency = 1
-				elseif particleSaved[obj] ~= nil then
-					pcall(function() obj.Transparency = particleSaved[obj] end)
-					particleSaved[obj] = nil
-				end
+			for object, hadCastShadow in pairs(superSavedCastShadow) do
+				if object and object.Parent then pcall(function() object.CastShadow = hadCastShadow end) end
 			end
+			if superOldGlobalShadows ~= nil then
+				LightingService.GlobalShadows = performanceEnabled and false or superOldGlobalShadows
+			end
+			superSavedEnabled, superSavedCastShadow, superOldGlobalShadows = {}, {}, nil
 		end
-	end})
-	tabMisc:Button({Name = "Low graphics (3D rendering)", Callback = function()
-		pcall(function() RunService:Set3dRenderingEnabled(false) end)
-		tabMisc:Label("3D rendering dimatikan. Jalankan ulang game untuk memulihkannya.")
-	end})
+	end
+	tabMisc:Toggle({Name = "ANTI LAG (SUPER MAX)", Default = false, Callback = setSuperAntiLag})
+
+	local function cleanupMiscAntiLag()
+		performanceEnabled = false
+		ultraPreferenceEnabled = false
+		if maxPerformanceStepConnection then pcall(function() maxPerformanceStepConnection:Disconnect() end); maxPerformanceStepConnection = nil end
+		if ultraPreferenceConnection then pcall(function() ultraPreferenceConnection:Disconnect() end); ultraPreferenceConnection = nil end
+		disconnectMiscList(miscPersistentConnections)
+		if superAntiLagEnabled then setSuperAntiLag(false) end
+		disconnectMiscList(superAntiLagConnections)
+	end
 	tabSettings:Section("Island")
 	tabSettings:Keybind({Name = "Open / close panel", Default = Enum.KeyCode.K, Callback = function()
 		if hidden then
@@ -3939,6 +4169,7 @@ local function Main()
 	local function destroy()
 		if not alive then return end
 		alive = false
+		if cleanupMiscAntiLag then pcall(cleanupMiscAntiLag) end
 		for _, c in ipairs(connections) do
 			pcall(function()
 				c:Disconnect()
@@ -4350,1130 +4581,4 @@ end
 local introOk = pcall(PlayScreenIntro, Main)
 if not introOk then
 	Main()
-end
-
-do
-local runService = game:GetService("RunService")
-local workspaceService = game:GetService("Workspace")
-local replicatedStorage = game:GetService("ReplicatedStorage")
-local lighting = game:GetService("Lighting")
-local players = game:GetService("Players")
-local tweenService = game:GetService("TweenService")
-local localPlayer = players.LocalPlayer
-local playerGui = localPlayer:WaitForChild("PlayerGui")
-if type(_G.RXMCustomTechCleanup) == "function" then
-    pcall(_G.RXMCustomTechCleanup)
-end
-pcall(function()
-    local coreGui = game:GetService("CoreGui")
-    local oldTechGui = coreGui:FindFirstChild("SkidwareUI")
-    if oldTechGui then oldTechGui:Destroy() end
-end)
-local oldGui = playerGui:FindFirstChild("CleanerGUI")
-if oldGui then
-    oldGui:Destroy()
-end
-local function addCorner(parent, radius)
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, radius)
-    corner.Parent = parent
-    return corner
-end
-local function makeButton(parent, text, color, position)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(0.9, 0, 0, 40)
-    button.Position = position
-    button.BackgroundColor3 = color
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.TextScaled = true
-    button.Text = text
-    button.Parent = parent
-    addCorner(button, 8)
-    return button
-end
-local cleanerGUI = Instance.new("ScreenGui")
-cleanerGUI.Name = "CleanerGUI"
-cleanerGUI.ResetOnSpawn = false
-cleanerGUI.Parent = playerGui
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 330, 0, 420)
-frame.Position = UDim2.new(0, 10, 0, 10)
-frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-frame.Active = true
-frame.Draggable = true
-frame.Parent = cleanerGUI
-addCorner(frame, 12)
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -25, 0, 25)
-titleLabel.Position = UDim2.new(0, 0, 0, 0)
-titleLabel.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-titleLabel.Text = "RXM HUB"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextScaled = true
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Parent = frame
-addCorner(titleLabel, 8)
-local creditLabel = Instance.new("TextLabel")
-creditLabel.Size = UDim2.new(1, 0, 0, 20)
-creditLabel.Position = UDim2.new(0, 0, 0, 25)
-creditLabel.BackgroundTransparency = 1
-creditLabel.Text = "by Marian KING"
-creditLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
-creditLabel.TextScaled = true
-creditLabel.Font = Enum.Font.SourceSansBold
-creditLabel.Parent = frame
-local closeButton = Instance.new("TextButton")
-closeButton.Size = UDim2.new(0, 25, 0, 25)
-closeButton.Position = UDim2.new(1, -25, 0, 0)
-closeButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-closeButton.Text = "X"
-closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-closeButton.TextScaled = true
-closeButton.Parent = frame
-addCorner(closeButton, 8)
-closeButton.MouseButton1Click:Connect(function()
-    if type(_G.RXMCustomTechCleanup) == "function" then
-        pcall(_G.RXMCustomTechCleanup)
-    end
-    cleanerGUI:Destroy()
-end)
-local TAB_ACTIVE = Color3.fromRGB(150, 0, 0)
-local TAB_INACTIVE = Color3.fromRGB(60, 60, 60)
-local tabBar = Instance.new("Frame")
-tabBar.Size = UDim2.new(0.9, 0, 0, 26)
-tabBar.Position = UDim2.new(0.05, 0, 0, 50)
-tabBar.BackgroundTransparency = 1
-tabBar.Parent = frame
-local function makeTab(text, position)
-    local tab = Instance.new("TextButton")
-    tab.Size = UDim2.new(0.31, 0, 1, 0)
-    tab.Position = position
-    tab.BackgroundColor3 = TAB_INACTIVE
-    tab.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tab.TextScaled = true
-    tab.Font = Enum.Font.SourceSansBold
-    tab.Text = text
-    tab.Parent = tabBar
-    addCorner(tab, 8)
-    return tab
-end
-local function makePage()
-    local page = Instance.new("Frame")
-    page.Size = UDim2.new(1, 0, 1, -82)
-    page.Position = UDim2.new(0, 0, 0, 82)
-    page.BackgroundTransparency = 1
-    page.Visible = false
-    page.Parent = frame
-    return page
-end
-local tabs = {
-    Cleaner = makeTab("Cleaner", UDim2.new(0, 0, 0, 0)),
-    Misc = makeTab("Misc", UDim2.new(0.345, 0, 0, 0)),
-    ["Custom Tech"] = makeTab("Custom Tech", UDim2.new(0.69, 0, 0, 0)),
-}
-local pages = {
-    Cleaner = makePage(),
-    Misc = makePage(),
-    ["Custom Tech"] = makePage(),
-}
-local function selectTab(name)
-    for tabName, page in pairs(pages) do
-        local selected = (tabName == name)
-        page.Visible = selected
-        tabs[tabName].BackgroundColor3 = selected and TAB_ACTIVE or TAB_INACTIVE
-    end
-end
-for tabName, tab in pairs(tabs) do
-    tab.MouseButton1Click:Connect(function()
-        selectTab(tabName)
-    end)
-end
-local cleanerPage = pages.Cleaner
-local maxPerformanceOn = false
-local thrownConnection = nil
-local maxPerformanceButton = makeButton(
-    cleanerPage,
-    "MAX PERFORMANCE: OFF",
-    Color3.fromRGB(150, 0, 0),
-    UDim2.new(0.05, 0, 0, 0)
-)
-local function destroyByName(parent, pattern)
-    for _, child in ipairs(parent:GetChildren()) do
-        if string.find(string.lower(child.Name), string.lower(pattern)) then
-            child:Destroy()
-        else
-            destroyByName(child, pattern)
-        end
-    end
-end
-local function watchChildAdded(parent, pattern)
-    parent.ChildAdded:Connect(function(child)
-        if maxPerformanceOn and string.find(string.lower(child.Name), string.lower(pattern)) then
-            child:Destroy()
-        end
-    end)
-end
-watchChildAdded(workspaceService, "Effect")
-watchChildAdded(replicatedStorage, "Effect")
-watchChildAdded(workspaceService, "MeshPart")
-watchChildAdded(replicatedStorage, "MeshPart")
-local THROWN_KEEP = {
-    Dragon = true,
-    Aurora = true,
-    starterdeb = true,
-}
-local function startThrownCleaner()
-    if thrownConnection then
-        return
-    end
-    thrownConnection = runService.Stepped:Connect(function()
-        local thrown = workspaceService:FindFirstChild("Thrown")
-        if thrown then
-            for _, obj in ipairs(thrown:GetChildren()) do
-                if obj and obj.Parent and not THROWN_KEEP[obj.Name] then
-                    obj:Destroy()
-                end
-            end
-        end
-    end)
-end
-local function stopThrownCleaner()
-    if thrownConnection then
-        thrownConnection:Disconnect()
-        thrownConnection = nil
-    end
-end
-maxPerformanceButton.MouseButton1Click:Connect(function()
-    maxPerformanceOn = not maxPerformanceOn
-    if maxPerformanceOn then
-        maxPerformanceButton.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        maxPerformanceButton.Text = "MAX PERFORMANCE: ON"
-        destroyByName(workspaceService, "Effect")
-        destroyByName(replicatedStorage, "Effect")
-        destroyByName(workspaceService, "MeshPart")
-        destroyByName(replicatedStorage, "MeshPart")
-        startThrownCleaner()
-        lighting.GlobalShadows = false
-        if setfpscap then
-            setfpscap(144)
-        end
-    else
-        maxPerformanceButton.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-        maxPerformanceButton.Text = "MAX PERFORMANCE: OFF"
-        stopThrownCleaner()
-        lighting.GlobalShadows = true
-    end
-end)
-local ultraOn = false
-local ultraConnection = nil
-local ultraButton = makeButton(
-    cleanerPage,
-    "ULTRA MAX PREFERENCE: OFF",
-    Color3.fromRGB(200, 50, 50),
-    UDim2.new(0.05, 0, 0, 48)
-)
-local PARTICLE_KEEP_LIST = {
-    "Shockwave2", "Shockwave", "PunchingWind", "landRays", "ohye", "DragWind",
-    "Maybe", "ItsWindTime", "STuff", "Land", "Wind2", "Combine", "pls", "omggg",
-    "MainWave", "TParticles2", "Lightning", "BROO3", "BROO2", "BROO5", "Impact",
-    "TBottom", "Skull", "BROO",
-}
-local particleKeep = {}
-for _, name in ipairs(PARTICLE_KEEP_LIST) do
-    particleKeep[name] = true
-end
-local HUNTER_ULT_ATTACHMENTS = { "6", "4-4", "4-3", "4-2", "4" }
-local LEGACY_EFFECTS = {
-    "UpSmoke2", "UpSmoke", "TreeFire", "Trans", "SmokeOne", "Smoke", "Leaves",
-    "ImpactGlow", "Effect", "BackSmoke", "Push",
-}
-local RESOURCE_EFFECTS = {
-    "HeadFirst", "FlyingKicks", "WhirlwindDrop", "VanishingKick", "FlashFinisher",
-    "PurpleAura", "PurpleM1", "le phone", "eject (2)", "Windy", "WindPurp", "Splash",
-    "Slam", "Rocks", "Rock", "PhonePhysicsTest", "NewSlash", "Mah", "Katana",
-    "FirstHit", "FinalEffects", "FSExpl", "EmergeSword", "CyborgArms", "Clone_Rig",
-    "CloneRigEm", "CloneRig", "BatBarrageEffects", "AuraHolder", "AtomicFX",
-    "Afterimage", "AcidExplosion", "QuickSlash", "MonsterSmash", "MonsterMoveTest",
-    "MonsterAwaken", "FiveSeasonsFX", "FinisherEmerge", "FirstUltimateMoveMech",
-    "FirstMonsterVFX", "DogVariant", "DeadlySliceVfx", "Consecutive Punches Finisher",
-    "Slap", "SecM1", "Fast", "Fang", "EsperAwakening", "EffectsMech", "DragonUppercut",
-    "DownSlam", "DoomFinish", "CrushingPushFinisher", "DashMechVfx", "Bossfight",
-    "allvfx", "AtomicSlash", "CrushingPull", "GreenLights", "GreenTornado",
-    "HeadFirstFinisher", "Collat", "Chain", "Cannon", "StoicBomb", "Meteor", "MechVfx",
-    "CrabSlash", "CrabBeam", "Brother", "Blackholevfx", "BarrageFinisher",
-}
-local function destroyNamed(parent, names)
-    for _, name in ipairs(names) do
-        local obj = parent:FindFirstChild(name)
-        if obj then
-            obj:Destroy()
-        end
-    end
-end
-local function cleanResources()
-    local resources = replicatedStorage:FindFirstChild("Resources")
-    if not resources then
-        return
-    end
-    local legacy = resources:FindFirstChild("LegacyReplication")
-    if legacy then
-        local hunterUlt = legacy:FindFirstChild("HunterUlt")
-        local attachment1 = hunterUlt and hunterUlt:FindFirstChild("Attachment1")
-        if attachment1 then
-            destroyNamed(attachment1, HUNTER_ULT_ATTACHMENTS)
-        end
-        destroyNamed(legacy, LEGACY_EFFECTS)
-    end
-    destroyNamed(resources, RESOURCE_EFFECTS)
-end
-local function getSmokeFolder()
-    local resources = replicatedStorage:FindFirstChild("Resources")
-    return resources and resources:FindFirstChild("Smoke")
-end
-local function shouldRemoveEmitter(inst, smoke)
-    return inst:IsA("ParticleEmitter")
-        and not particleKeep[inst.Name]
-        and not (smoke and inst:IsDescendantOf(smoke))
-end
-local function removeEmitters(root, smoke)
-    for _, inst in ipairs(root:GetDescendants()) do
-        if shouldRemoveEmitter(inst, smoke) then
-            inst:Destroy()
-        end
-    end
-end
-local function showNotice(text)
-    task.spawn(function()
-        local notice = Instance.new("TextLabel")
-        notice.Size = UDim2.new(0, 200, 0, 50)
-        notice.Position = UDim2.new(0.5, -100, 0.5, -25)
-        notice.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
-        notice.TextColor3 = Color3.fromRGB(255, 255, 255)
-        notice.TextScaled = true
-        notice.Text = text
-        notice.Font = Enum.Font.SourceSansBold
-        notice.Parent = cleanerGUI
-        addCorner(notice, 12)
-        task.wait(2)
-        notice:Destroy()
-    end)
-end
-ultraButton.MouseButton1Click:Connect(function()
-    ultraOn = not ultraOn
-    if ultraOn then
-        ultraButton.Text = "ULTRA MAX PREFERENCE: ON"
-        ultraButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-        local smoke = getSmokeFolder()
-        cleanResources()
-        removeEmitters(workspaceService, smoke)
-        showNotice("✅ Successfully completed!")
-        ultraConnection = game.DescendantAdded:Connect(function(descendant)
-            if shouldRemoveEmitter(descendant, smoke) then
-                descendant:Destroy()
-            end
-        end)
-    else
-        ultraButton.Text = "ULTRA MAX PREFERENCE: OFF"
-        ultraButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        if ultraConnection then
-            ultraConnection:Disconnect()
-            ultraConnection = nil
-        end
-    end
-end)
-local superMaxButton = makeButton(
-    cleanerPage,
-    "SUPER MAX",
-    Color3.fromRGB(100, 0, 200),
-    UDim2.new(0.05, 0, 0, 96)
-)
-local superMaxActive = false
-local SUPER_CLASSES = { "ParticleEmitter", "Trail", "Beam", "Fire", "Smoke", "Sparkles", "Explosion" }
-local function disableEffect(inst)
-    if table.find(SUPER_CLASSES, inst.ClassName) then
-        pcall(function()
-            if inst:IsA("Explosion") then
-                inst:Destroy()
-            else
-                inst.Enabled = false
-            end
-        end)
-    end
-end
-local function disableEffectsIn(root)
-    for _, inst in ipairs(root:GetDescendants()) do
-        disableEffect(inst)
-    end
-end
-superMaxButton.MouseButton1Click:Connect(function()
-    if superMaxActive then
-        return
-    end
-    superMaxActive = true
-    superMaxButton.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
-    superMaxButton.Text = "SUPER MAX ACTIVATED"
-    disableEffectsIn(workspaceService)
-    if localPlayer.Character then
-        disableEffectsIn(localPlayer.Character)
-    end
-    local backpack = localPlayer:FindFirstChild("Backpack")
-    if backpack then
-        disableEffectsIn(backpack)
-    end
-    workspaceService.DescendantAdded:Connect(disableEffect)
-    localPlayer.CharacterAdded:Connect(function(character)
-        disableEffectsIn(character)
-        character.DescendantAdded:Connect(disableEffect)
-    end)
-    print("✅ OMG: Effect disabling logic has been activated!")
-end)
-local miscPage = pages.Misc
-local switchRow = Instance.new("Frame")
-switchRow.Size = UDim2.new(0.9, 0, 0, 44)
-switchRow.Position = UDim2.new(0.05, 0, 0, 0)
-switchRow.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-switchRow.Parent = miscPage
-addCorner(switchRow, 8)
-local switchLabel = Instance.new("TextLabel")
-switchLabel.Size = UDim2.new(0.6, 0, 1, -16)
-switchLabel.Position = UDim2.new(0, 10, 0, 8)
-switchLabel.BackgroundTransparency = 1
-switchLabel.Text = "Anti Lag: OFF"
-switchLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-switchLabel.TextScaled = true
-switchLabel.TextXAlignment = Enum.TextXAlignment.Left
-switchLabel.Font = Enum.Font.SourceSansBold
-switchLabel.Parent = switchRow
-local SWITCH_OFF_COLOR = Color3.fromRGB(150, 0, 0)
-local SWITCH_ON_COLOR = Color3.fromRGB(0, 150, 0)
-local KNOB_OFF_POS = UDim2.new(0, 3, 0.5, -9)
-local KNOB_ON_POS = UDim2.new(1, -21, 0.5, -9)
-local switchTrack = Instance.new("TextButton")
-switchTrack.Size = UDim2.new(0, 50, 0, 24)
-switchTrack.Position = UDim2.new(1, -60, 0.5, -12)
-switchTrack.BackgroundColor3 = SWITCH_OFF_COLOR
-switchTrack.Text = ""
-switchTrack.AutoButtonColor = false
-switchTrack.Parent = switchRow
-addCorner(switchTrack, 12)
-local switchKnob = Instance.new("Frame")
-switchKnob.Size = UDim2.new(0, 18, 0, 18)
-switchKnob.Position = KNOB_OFF_POS
-switchKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-switchKnob.Parent = switchTrack
-addCorner(switchKnob, 9)
-local switchHint = Instance.new("TextLabel")
-switchHint.Size = UDim2.new(0.9, 0, 0, 56)
-switchHint.Position = UDim2.new(0.05, 0, 0, 52)
-switchHint.BackgroundTransparency = 1
-switchHint.Text = "Lowers graphics quality, shadows, textures and effects to reduce lag. Turn it off to restore everything."
-switchHint.TextColor3 = Color3.fromRGB(180, 180, 180)
-switchHint.TextSize = 13
-switchHint.TextWrapped = true
-switchHint.TextXAlignment = Enum.TextXAlignment.Left
-switchHint.TextYAlignment = Enum.TextYAlignment.Top
-switchHint.Parent = miscPage
-local function setSwitchVisual(on)
-    switchLabel.Text = on and "Anti Lag: ON" or "Anti Lag: OFF"
-    local info = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-    tweenService:Create(switchKnob, info, { Position = on and KNOB_ON_POS or KNOB_OFF_POS }):Play()
-    tweenService:Create(switchTrack, info, { BackgroundColor3 = on and SWITCH_ON_COLOR or SWITCH_OFF_COLOR }):Play()
-end
-local antiLagOn = false
-local antiLagToken = 0
-local antiLagConnections = {}
-local savedProps = setmetatable({}, { __mode = "k" })
-local savedGlobalShadows = nil
-local savedQuality = nil
-local savedTerrain = nil
-local function isCharacterDescendant(inst)
-    local model = inst:FindFirstAncestorOfClass("Model")
-    return model ~= nil and players:GetPlayerFromCharacter(model) ~= nil
-end
-local function applyAntiLag(inst)
-    if savedProps[inst] then
-        return
-    end
-    pcall(function()
-        if inst:IsA("BasePart") then
-            if inst:IsA("Terrain") or isCharacterDescendant(inst) then
-                return
-            end
-            savedProps[inst] = {
-                Material = inst.Material,
-                Reflectance = inst.Reflectance,
-                CastShadow = inst.CastShadow,
-            }
-            inst.Material = Enum.Material.SmoothPlastic
-            inst.Reflectance = 0
-            inst.CastShadow = false
-        elseif inst:IsA("Decal") or inst:IsA("Texture") then
-            if isCharacterDescendant(inst) then
-                return
-            end
-            savedProps[inst] = { Transparency = inst.Transparency }
-            inst.Transparency = 1
-        elseif inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam")
-            or inst:IsA("Fire") or inst:IsA("Smoke") or inst:IsA("Sparkles")
-            or inst:IsA("PostEffect") then
-            savedProps[inst] = { Enabled = inst.Enabled }
-            inst.Enabled = false
-        end
-    end)
-end
-local function enableAntiLag()
-    antiLagToken = antiLagToken + 1
-    local token = antiLagToken
-    if savedGlobalShadows == nil then
-        savedGlobalShadows = lighting.GlobalShadows
-    end
-    lighting.GlobalShadows = false
-    pcall(function()
-        if savedQuality == nil then
-            savedQuality = settings().Rendering.QualityLevel
-        end
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-    end)
-    local terrain = workspaceService:FindFirstChildOfClass("Terrain")
-    if terrain and not savedTerrain then
-        pcall(function()
-            savedTerrain = {
-                terrain = terrain,
-                WaterWaveSize = terrain.WaterWaveSize,
-                WaterWaveSpeed = terrain.WaterWaveSpeed,
-                WaterReflectance = terrain.WaterReflectance,
-                WaterTransparency = terrain.WaterTransparency,
-            }
-            terrain.WaterWaveSize = 0
-            terrain.WaterWaveSpeed = 0
-            terrain.WaterReflectance = 0
-            terrain.WaterTransparency = 0
-        end)
-    end
-    table.insert(antiLagConnections, workspaceService.DescendantAdded:Connect(applyAntiLag))
-    table.insert(antiLagConnections, lighting.DescendantAdded:Connect(applyAntiLag))
-    task.spawn(function()
-        local count = 0
-        for _, root in ipairs({ lighting, workspaceService }) do
-            for _, inst in ipairs(root:GetDescendants()) do
-                if token ~= antiLagToken then
-                    return
-                end
-                applyAntiLag(inst)
-                count = count + 1
-                if count % 400 == 0 then
-                    task.wait()
-                end
-            end
-        end
-    end)
-end
-local function disableAntiLag()
-    antiLagToken = antiLagToken + 1
-    local token = antiLagToken
-    for _, connection in ipairs(antiLagConnections) do
-        connection:Disconnect()
-    end
-    antiLagConnections = {}
-    if savedGlobalShadows ~= nil then
-        lighting.GlobalShadows = savedGlobalShadows
-        savedGlobalShadows = nil
-    end
-    if savedQuality ~= nil then
-        pcall(function()
-            settings().Rendering.QualityLevel = savedQuality
-        end)
-        savedQuality = nil
-    end
-    if savedTerrain then
-        local data = savedTerrain
-        savedTerrain = nil
-        pcall(function()
-            data.terrain.WaterWaveSize = data.WaterWaveSize
-            data.terrain.WaterWaveSpeed = data.WaterWaveSpeed
-            data.terrain.WaterReflectance = data.WaterReflectance
-            data.terrain.WaterTransparency = data.WaterTransparency
-        end)
-    end
-    task.spawn(function()
-        local count = 0
-        for inst, props in pairs(savedProps) do
-            if token ~= antiLagToken then
-                return
-            end
-            if inst.Parent then
-                for prop, value in pairs(props) do
-                    pcall(function()
-                        inst[prop] = value
-                    end)
-                end
-            end
-            savedProps[inst] = nil
-            count = count + 1
-            if count % 400 == 0 then
-                task.wait()
-            end
-        end
-    end)
-end
-switchTrack.MouseButton1Click:Connect(function()
-    antiLagOn = not antiLagOn
-    setSwitchVisual(antiLagOn)
-    if antiLagOn then
-        enableAntiLag()
-    else
-        disableAntiLag()
-    end
-end)
-local UserInputService = game:GetService("UserInputService")
-local customTechPage = pages["Custom Tech"]
-local TechConfig = {
-    Enabled = true,
-    LethalEnabled = true,
-    LethalAnim = "rbxassetid://10503381238",
-    LethalDelay = 0.232,
-    LethalJump = 55,
-    LethalAccuracy = 15,
-    LethalCancelDelay = 0.4,
-    LethalMode = "V1",
-    CancelEnabled = true,
-    CooldownActive = true,
-    NoClipEnabled = true,
-    DashRange = 8,
-    TouchMode = false,
-    Platform = "PC",
-    Keybind = "E",
-    CooldownAnims = {
-        ["10491993682"] = true,
-        ["10479335397"] = true,
-        ["13380255751"] = true,
-    },
-}
-local techScriptId = math.random(1, 1000000)
-_G.RXMCustomTechId = techScriptId
-local function isTechCurrent()
-    return _G.RXMCustomTechId == techScriptId
-end
-local isTechNoclipping = false
-local isTechCooldown = false
-local isTechExecuting = false
-local techCooldownBar
-local techCooldownFill
-local techConnections = {}
-local savedTechCollisions = setmetatable({}, { __mode = "k" })
-local function getTechId(value)
-    return tostring(value or ""):match("%d+")
-end
-local function normalizeTechAnimationId(value)
-    value = tostring(value or "")
-    local id = getTechId(value)
-    if not id then
-        return value
-    end
-    return "rbxassetid://" .. id
-end
-local function clipTech()
-    isTechNoclipping = false
-    for part, oldCanCollide in pairs(savedTechCollisions) do
-        if part and part.Parent then
-            pcall(function()
-                part.CanCollide = oldCanCollide
-            end)
-        end
-        savedTechCollisions[part] = nil
-    end
-    local character = localPlayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if humanoid then
-        humanoid.AutoRotate = true
-    end
-end
-local function forceCancelTech()
-    clipTech()
-    local character = localPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if root then
-        for _, object in ipairs(root:GetChildren()) do
-            if object:IsA("BodyVelocity") or object:IsA("LinearVelocity")
-                or object:IsA("Attachment") or object:IsA("BodyAngularVelocity") then
-                object:Destroy()
-            end
-        end
-        root.AssemblyLinearVelocity = Vector3.zero
-    end
-end
-local function startTechCooldown(duration)
-    if not isTechCurrent() or isTechCooldown or not TechConfig.CooldownActive then
-        return
-    end
-    isTechCooldown = true
-    if techCooldownBar and techCooldownFill then
-        techCooldownBar.Visible = true
-        techCooldownFill.Size = UDim2.new(1, 0, 1, 0)
-        tweenService:Create(
-            techCooldownFill,
-            TweenInfo.new(duration, Enum.EasingStyle.Linear),
-            { Size = UDim2.new(0, 0, 1, 0) }
-        ):Play()
-    end
-    task.delay(duration, function()
-        isTechCooldown = false
-        if techCooldownBar and techCooldownBar.Parent then
-            techCooldownBar.Visible = false
-        end
-    end)
-end
-local function fireTechDash()
-    local character = localPlayer.Character
-    local communicate = character and character:FindFirstChild("Communicate")
-    if communicate then
-        pcall(function()
-            communicate:FireServer({
-                Dash = Enum.KeyCode.W,
-                Key = Enum.KeyCode.Q,
-                Goal = "KeyPress",
-            })
-        end)
-    end
-end
-local function getTechTorsoTarget()
-    local character = localPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then
-        return nil
-    end
-    local params = OverlapParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { character }
-    local targetPart
-    local closestDistance = math.max(0, tonumber(TechConfig.DashRange) or 8)
-    for _, part in ipairs(workspaceService:GetPartBoundsInRadius(root.Position, closestDistance, params)) do
-        local model = part:FindFirstAncestorOfClass("Model")
-        if model and model ~= character and model:FindFirstChildOfClass("Humanoid") then
-            local torso = model:FindFirstChild("Torso")
-                or model:FindFirstChild("UpperTorso")
-                or model:FindFirstChild("HumanoidRootPart")
-            if torso then
-                local distance = (root.Position - torso.Position).Magnitude
-                if distance < closestDistance then
-                    closestDistance = distance
-                    targetPart = torso
-                end
-            end
-        end
-    end
-    return targetPart
-end
-local function executeTechLethal()
-    if not isTechCurrent() or isTechExecuting or isTechCooldown then
-        return
-    end
-    if not TechConfig.Enabled or not TechConfig.LethalEnabled then
-        return
-    end
-    local character = localPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not root or not humanoid then
-        return
-    end
-    local target = getTechTorsoTarget()
-    if not target then
-        clipTech()
-        return
-    end
-    isTechExecuting = true
-    if not TechConfig.TouchMode then
-        task.wait(math.max(0, tonumber(TechConfig.LethalDelay) or 0))
-    end
-    if not isTechCurrent() or not root.Parent or not target.Parent then
-        isTechExecuting = false
-        clipTech()
-        return
-    end
-    root.AssemblyLinearVelocity = Vector3.new(
-        root.AssemblyLinearVelocity.X,
-        tonumber(TechConfig.LethalJump) or 55,
-        root.AssemblyLinearVelocity.Z
-    )
-    isTechNoclipping = true
-    fireTechDash()
-    local startTime = tick()
-    local flipped = false
-    local direction = target.Position - root.Position
-    if direction.Magnitude < 0.001 then
-        direction = root.CFrame.LookVector
-    else
-        direction = direction.Unit
-    end
-    local sideVector = Vector3.new(-direction.Z, 0, direction.X)
-    local angularVelocity
-    if TechConfig.LethalMode == "V1" then
-        angularVelocity = Instance.new("BodyAngularVelocity")
-        angularVelocity.MaxTorque = Vector3.new(0, 1000000, 0)
-        angularVelocity.P = 15000
-        angularVelocity.Parent = root
-    end
-    local connection
-    connection = runService.Heartbeat:Connect(function()
-        if not isTechCurrent() or not target or not target.Parent or not root or not root.Parent then
-            if angularVelocity then angularVelocity:Destroy() end
-            clipTech()
-            isTechExecuting = false
-            if connection then connection:Disconnect() end
-            return
-        end
-        local elapsed = tick() - startTime
-        local targetPosition = target.Position
-        local rootPosition = root.Position
-        humanoid.AutoRotate = false
-        if TechConfig.LethalMode == "V1" then
-            local angle = (elapsed / 0.45) * (math.pi / 1.5)
-            local radius = (tonumber(TechConfig.LethalAccuracy) or 15)
-                * (1 - math.clamp(elapsed / 0.45, 0, 1))
-            local lookPosition = targetPosition
-                + (sideVector * math.cos(angle) + direction * math.sin(angle)) * radius
-            local lookCFrame = CFrame.lookAt(
-                rootPosition,
-                Vector3.new(lookPosition.X, rootPosition.Y, lookPosition.Z)
-            )
-            local relativeCFrame = root.CFrame:Inverse() * lookCFrame
-            local _, yaw, _ = relativeCFrame:ToEulerAnglesXYZ()
-            if angularVelocity and angularVelocity.Parent then
-                angularVelocity.AngularVelocity = Vector3.new(0, yaw * 30, 0)
-            end
-        elseif TechConfig.LethalMode == "V2" then
-            if elapsed >= (tonumber(TechConfig.LethalAccuracy) or 0.25) and not flipped then
-                root.CFrame = root.CFrame * CFrame.Angles(0, math.pi, 0)
-                flipped = true
-            end
-        end
-        local distanceXZ = (Vector2.new(rootPosition.X, rootPosition.Z)
-            - Vector2.new(targetPosition.X, targetPosition.Z)).Magnitude
-        if TechConfig.CancelEnabled
-            and elapsed > (tonumber(TechConfig.LethalCancelDelay) or 0.4)
-            and distanceXZ < 2.2 then
-            if angularVelocity then angularVelocity:Destroy() end
-            forceCancelTech()
-            isTechExecuting = false
-            connection:Disconnect()
-            return
-        end
-        if not TechConfig.Enabled or elapsed > 1.5 then
-            if angularVelocity then angularVelocity:Destroy() end
-            clipTech()
-            isTechExecuting = false
-            connection:Disconnect()
-        end
-    end)
-end
-local techScroll = Instance.new("ScrollingFrame")
-techScroll.Name = "CustomTechSettings"
-techScroll.Size = UDim2.new(1, 0, 1, 0)
-techScroll.Position = UDim2.new(0, 0, 0, 0)
-techScroll.BackgroundTransparency = 1
-techScroll.BorderSizePixel = 0
-techScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-techScroll.ScrollBarThickness = 3
-techScroll.ScrollingDirection = Enum.ScrollingDirection.Y
-techScroll.Parent = customTechPage
-local techLayout = Instance.new("UIListLayout")
-techLayout.Padding = UDim.new(0, 6)
-techLayout.SortOrder = Enum.SortOrder.LayoutOrder
-techLayout.Parent = techScroll
-techLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    techScroll.CanvasSize = UDim2.new(0, 0, 0, techLayout.AbsoluteContentSize.Y + 8)
-end)
-local function createTechToggle(labelText, configKey, onChanged)
-    local button = Instance.new("TextButton")
-    button.Name = configKey .. "Toggle"
-    button.Size = UDim2.new(1, -8, 0, 34)
-    button.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    button.BorderSizePixel = 0
-    button.TextColor3 = Color3.fromRGB(245, 245, 245)
-    button.Font = Enum.Font.GothamSemibold
-    button.TextSize = 12
-    button.TextXAlignment = Enum.TextXAlignment.Left
-    button.Parent = techScroll
-    addCorner(button, 6)
-    local function refresh()
-        button.Text = "  " .. labelText .. ": " .. (TechConfig[configKey] and "ON" or "OFF")
-        button.BackgroundColor3 = TechConfig[configKey]
-            and Color3.fromRGB(35, 90, 50) or Color3.fromRGB(35, 35, 35)
-    end
-    button.MouseButton1Click:Connect(function()
-        TechConfig[configKey] = not TechConfig[configKey]
-        refresh()
-        if onChanged then onChanged(TechConfig[configKey]) end
-    end)
-    refresh()
-    return button
-end
-local function createTechInput(labelText, configKey, options)
-    options = options or {}
-    local row = Instance.new("Frame")
-    row.Name = configKey .. "Row"
-    row.Size = UDim2.new(1, -8, 0, 34)
-    row.BackgroundTransparency = 1
-    row.Parent = techScroll
-    local label = Instance.new("TextLabel")
-    label.Name = "Label"
-    label.Size = UDim2.new(0.48, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(205, 205, 205)
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 11
-    label.TextWrapped = true
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Text = labelText
-    label.Parent = row
-    local input = Instance.new("TextBox")
-    input.Name = "Value"
-    input.Size = UDim2.new(0.5, 0, 1, 0)
-    input.Position = UDim2.new(0.5, 0, 0, 0)
-    input.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    input.BorderSizePixel = 0
-    input.ClearTextOnFocus = false
-    input.TextColor3 = Color3.fromRGB(255, 255, 255)
-    input.Font = Enum.Font.Gotham
-    input.TextSize = 11
-    input.Text = tostring(TechConfig[configKey])
-    input.Parent = row
-    addCorner(input, 5)
-    input.FocusLost:Connect(function()
-        local text = input.Text
-        if options.animationId then
-            TechConfig[configKey] = normalizeTechAnimationId(text)
-        elseif options.number then
-            local number = tonumber(text)
-            if number then
-                TechConfig[configKey] = number
-            end
-        else
-            TechConfig[configKey] = text
-        end
-        input.Text = tostring(TechConfig[configKey])
-        if options.onChanged then options.onChanged(TechConfig[configKey]) end
-    end)
-    return row, label, input
-end
-local statusToggle = createTechToggle("Tech Status", "Enabled")
-local lethalToggle = createTechToggle("Lethal", "LethalEnabled")
-local modeButton = Instance.new("TextButton")
-modeButton.Name = "LethalModeToggle"
-modeButton.Size = UDim2.new(1, -8, 0, 34)
-modeButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-modeButton.BorderSizePixel = 0
-modeButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-modeButton.Font = Enum.Font.GothamSemibold
-modeButton.TextSize = 12
-modeButton.TextXAlignment = Enum.TextXAlignment.Left
-modeButton.Parent = techScroll
-addCorner(modeButton, 6)
-local function refreshTechMode()
-    modeButton.Text = "  Lethal Mode: " .. TechConfig.LethalMode .. "  (tap to switch)"
-    local accuracyLabel = techScroll:FindFirstChild("LethalAccuracyRow")
-    local label = accuracyLabel and accuracyLabel:FindFirstChild("Label")
-    if label then
-        label.Text = TechConfig.LethalMode == "V2" and "Flip Delay" or "Accuracy / Flip"
-    end
-end
-modeButton.MouseButton1Click:Connect(function()
-    if TechConfig.LethalMode == "V1" then
-        TechConfig.LethalMode = "V2"
-        TechConfig.LethalAccuracy = 0.25
-    else
-        TechConfig.LethalMode = "V1"
-        TechConfig.LethalAccuracy = 15
-    end
-    refreshTechMode()
-    local accuracyRow = techScroll:FindFirstChild("LethalAccuracyRow")
-    local input = accuracyRow and accuracyRow:FindFirstChild("Value")
-    if input then input.Text = tostring(TechConfig.LethalAccuracy) end
-end)
-createTechInput("Lethal Animation ID", "LethalAnim", { animationId = true })
-createTechInput("Delay", "LethalDelay", { number = true })
-createTechInput("Jump Power", "LethalJump", { number = true })
-local accuracyRow = createTechInput("Accuracy / Flip", "LethalAccuracy", { number = true })
-createTechInput("Dash Range", "DashRange", { number = true })
-createTechInput("Cancel Delay", "LethalCancelDelay", { number = true })
-createTechInput("Keybind", "Keybind")
-createTechToggle("Cancel System", "CancelEnabled")
-createTechToggle("Cooldown System", "CooldownActive")
-createTechToggle("NoClip", "NoClipEnabled")
-createTechToggle("Touch Mode", "TouchMode", function(enabled)
-    if _G.RXMCustomTechMobileTrigger then
-        _G.RXMCustomTechMobileTrigger.Visible = enabled and TechConfig.Platform == "Mobile"
-    end
-end)
-local platformButton = Instance.new("TextButton")
-platformButton.Name = "PlatformToggle"
-platformButton.Size = UDim2.new(1, -8, 0, 34)
-platformButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-platformButton.BorderSizePixel = 0
-platformButton.TextColor3 = Color3.fromRGB(245, 245, 245)
-platformButton.Font = Enum.Font.GothamSemibold
-platformButton.TextSize = 12
-platformButton.TextXAlignment = Enum.TextXAlignment.Left
-platformButton.Parent = techScroll
-addCorner(platformButton, 6)
-local function refreshTechPlatform()
-    platformButton.Text = "  Platform: " .. TechConfig.Platform .. "  (tap to switch)"
-end
-platformButton.MouseButton1Click:Connect(function()
-    TechConfig.Platform = TechConfig.Platform == "PC" and "Mobile" or "PC"
-    refreshTechPlatform()
-    if _G.RXMCustomTechMobileTrigger then
-        _G.RXMCustomTechMobileTrigger.Visible = TechConfig.TouchMode and TechConfig.Platform == "Mobile"
-    end
-end)
-refreshTechPlatform()
-local cooldownListRow = Instance.new("Frame")
-cooldownListRow.Name = "CooldownAnimsRow"
-cooldownListRow.Size = UDim2.new(1, -8, 0, 48)
-cooldownListRow.BackgroundTransparency = 1
-cooldownListRow.Parent = techScroll
-local cooldownListLabel = Instance.new("TextLabel")
-cooldownListLabel.Size = UDim2.new(0.48, 0, 1, 0)
-cooldownListLabel.BackgroundTransparency = 1
-cooldownListLabel.Text = "Cooldown Animation IDs"
-cooldownListLabel.TextColor3 = Color3.fromRGB(205, 205, 205)
-cooldownListLabel.Font = Enum.Font.Gotham
-cooldownListLabel.TextSize = 11
-cooldownListLabel.TextWrapped = true
-cooldownListLabel.TextXAlignment = Enum.TextXAlignment.Left
-cooldownListLabel.Parent = cooldownListRow
-local cooldownListInput = Instance.new("TextBox")
-cooldownListInput.Size = UDim2.new(0.5, 0, 1, 0)
-cooldownListInput.Position = UDim2.new(0.5, 0, 0, 0)
-cooldownListInput.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-cooldownListInput.BorderSizePixel = 0
-cooldownListInput.ClearTextOnFocus = false
-cooldownListInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-cooldownListInput.Font = Enum.Font.Gotham
-cooldownListInput.TextSize = 10
-cooldownListInput.TextWrapped = true
-cooldownListInput.Text = "10491993682, 10479335397, 13380255751"
-cooldownListInput.Parent = cooldownListRow
-addCorner(cooldownListInput, 5)
-cooldownListInput.FocusLost:Connect(function()
-    local newAnimations = {}
-    for id in string.gmatch(cooldownListInput.Text, "%d+") do
-        newAnimations[id] = true
-    end
-    TechConfig.CooldownAnims = newAnimations
-    local ids = {}
-    for id in pairs(newAnimations) do table.insert(ids, id) end
-    table.sort(ids)
-    cooldownListInput.Text = table.concat(ids, ", ")
-end)
-refreshTechMode()
-techCooldownBar = Instance.new("Frame")
-techCooldownBar.Name = "TechCooldownBar"
-techCooldownBar.Size = UDim2.new(1, 0, 0, 3)
-techCooldownBar.Position = UDim2.new(0, 0, 1, -3)
-techCooldownBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-techCooldownBar.BackgroundTransparency = 0.35
-techCooldownBar.BorderSizePixel = 0
-techCooldownBar.Visible = false
-techCooldownBar.ZIndex = 10
-techCooldownBar.Parent = frame
-techCooldownFill = Instance.new("Frame")
-techCooldownFill.Name = "Fill"
-techCooldownFill.Size = UDim2.new(1, 0, 1, 0)
-techCooldownFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-techCooldownFill.BorderSizePixel = 0
-techCooldownFill.ZIndex = 11
-techCooldownFill.Parent = techCooldownBar
-local mobileTrigger = Instance.new("TextButton")
-mobileTrigger.Name = "CustomTechMobileTrigger"
-mobileTrigger.Size = UDim2.new(0, 56, 0, 56)
-mobileTrigger.Position = UDim2.new(0.7, 0, 0.5, 0)
-mobileTrigger.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mobileTrigger.Text = "TECH"
-mobileTrigger.TextColor3 = Color3.fromRGB(255, 255, 255)
-mobileTrigger.Font = Enum.Font.GothamBold
-mobileTrigger.TextSize = 11
-mobileTrigger.Visible = TechConfig.TouchMode and TechConfig.Platform == "Mobile"
-mobileTrigger.Draggable = true
-mobileTrigger.Active = true
-mobileTrigger.Parent = cleanerGUI
-addCorner(mobileTrigger, 28)
-local mobileTriggerStroke = Instance.new("UIStroke")
-mobileTriggerStroke.Color = Color3.fromRGB(60, 60, 60)
-mobileTriggerStroke.Parent = mobileTrigger
-_G.RXMCustomTechMobileTrigger = mobileTrigger
-mobileTrigger.MouseButton1Click:Connect(executeTechLethal)
-table.insert(techConnections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not isTechCurrent() or gameProcessed or not TechConfig.Enabled then return end
-    if TechConfig.TouchMode and TechConfig.Platform == "PC" then
-        local keyName = tostring(TechConfig.Keybind):upper()
-        local keyCode = Enum.KeyCode[keyName]
-        if keyCode and input.KeyCode == keyCode then
-            executeTechLethal()
-        end
-    end
-end))
-local function setupTechCharacter(character)
-    if not isTechCurrent() then return end
-    local humanoid = character:WaitForChild("Humanoid", 10)
-    if not humanoid then return end
-    table.insert(techConnections, humanoid.AnimationPlayed:Connect(function(track)
-        if not isTechCurrent() then return end
-        local animation = track and track.Animation
-        if not animation then return end
-        local animationId = getTechId(animation.AnimationId)
-        if TechConfig.CooldownActive and animationId and TechConfig.CooldownAnims[animationId] then
-            startTechCooldown(5)
-        end
-        if TechConfig.TouchMode or not TechConfig.Enabled or not TechConfig.LethalEnabled then return end
-        if normalizeTechAnimationId(animation.AnimationId) == normalizeTechAnimationId(TechConfig.LethalAnim) then
-            executeTechLethal()
-        end
-    end))
-end
-if localPlayer.Character then
-    task.spawn(setupTechCharacter, localPlayer.Character)
-end
-table.insert(techConnections, localPlayer.CharacterAdded:Connect(setupTechCharacter))
-table.insert(techConnections, runService.Stepped:Connect(function()
-    if not isTechCurrent() then return end
-    local character = localPlayer.Character
-    if not character then return end
-    if isTechNoclipping and TechConfig.NoClipEnabled then
-        for _, part in ipairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                if savedTechCollisions[part] == nil then
-                    savedTechCollisions[part] = part.CanCollide
-                end
-                part.CanCollide = false
-            end
-        end
-    elseif next(savedTechCollisions) ~= nil then
-        clipTech()
-    end
-end))
-local function refreshTechMobileTrigger()
-    mobileTrigger.Visible = TechConfig.TouchMode and TechConfig.Platform == "Mobile"
-end
-refreshTechMobileTrigger()
-_G.RXMCustomTechCleanup = function()
-    TechConfig.Enabled = false
-    forceCancelTech()
-    _G.RXMCustomTechId = nil
-    _G.RXMCustomTechMobileTrigger = nil
-    for _, connection in ipairs(techConnections) do
-        pcall(function() connection:Disconnect() end)
-    end
-    for index in pairs(techConnections) do
-        techConnections[index] = nil
-    end
-    if mobileTrigger and mobileTrigger.Parent then
-        mobileTrigger:Destroy()
-    end
-    if techCooldownBar and techCooldownBar.Parent then
-        techCooldownBar.Visible = false
-    end
-end
-selectTab("Cleaner")
 end
