@@ -2971,12 +2971,12 @@ local function Main()
 	local function buildTech(tab)
 		local techs = {
 			{
-				name = "Custom Tech",
-				kind = "supa",
+				name = "Loop Dash",
+				kind = "loop",
 				anim = "rbxassetid://10503381238",
 				enabled = false,
 				delay = 0.299,
-				jump = 48,
+				jump = 55,
 				accuracy = 6.5,
 				cancelDelay = 0.22,
 				cancelEnabled = true,
@@ -2989,10 +2989,10 @@ local function Main()
 				anim = "rbxassetid://12296113986",
 				enabled = false,
 				delay = 1.65,
-				jump = 65,
-				accuracy = -14.5,
+				jump = 63.8,
+				flipDelay = 0.245,
 				cancelDelay = 0.3,
-				cancelEnabled = false,
+				cancelEnabled = true,
 				noclip = false,
 				range = 6,
 			},
@@ -3456,6 +3456,7 @@ local function Main()
 			return target
 		end
 		local lethalRunning = false
+		-- LETHAL V2: lompat + dash, lalu putar 180 derajat sekali setelah flipDelay
 		local function activateLethal(tech)
 			if not alive or not tech.enabled or lethalRunning or os.clock() < techLockUntil then return end
 			local character = LocalPlayer.Character
@@ -3469,35 +3470,33 @@ local function Main()
 			end
 			lethalRunning = true
 			local sessionToken = lethalToken
+			local function aborted()
+				return not alive or sessionToken ~= lethalToken or not tech.enabled or character ~= LocalPlayer.Character or not target.Parent or not root.Parent
+			end
 			task.wait(math.max(0, tech.delay))
-			if not alive or sessionToken ~= lethalToken or not tech.enabled or character ~= LocalPlayer.Character or not target.Parent or not root.Parent then
+			if aborted() then
 				lethalRunning = false
 				return
 			end
-			local offset = target.Position - root.Position
-			if offset.Magnitude < 0.001 then offset = root.CFrame.LookVector end
-			local forward = offset.Unit
-			local side = Vector3.new(-forward.Z, 0, forward.X)
-			humanoid.AutoRotate = false
-			root.CFrame = CFrame.lookAt(root.Position, Vector3.new(target.Position.X, root.Position.Y, target.Position.Z))
 			root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, tech.jump, root.AssemblyLinearVelocity.Z)
 			noclipOwners.Lethal = tech.noclip == true
 			task.wait(0)
+			if aborted() then
+				noclipOwners.Lethal = false
+				if humanoid.Parent then humanoid.AutoRotate = true end
+				lethalRunning = false
+				return
+			end
 			sendDashInput()
 			local started = os.clock()
-			local angular = root:FindFirstChild("RIzXLethalBAV") or Instance.new("BodyAngularVelocity")
-			angular.Name = "RIzXLethalBAV"
-			angular.MaxTorque = Vector3.new(0, math.huge, 0)
-			angular.P = 100000
-			angular.AngularVelocity = Vector3.zero
-			angular.Parent = root
+			local flipped = false
+			humanoid.AutoRotate = false
 			local connection
 			local finished = false
 			local function finishSession(clearVelocity)
 				if finished then return end
 				finished = true
 				if connection then connection:Disconnect(); connection = nil end
-				if angular and angular.Parent then angular:Destroy() end
 				noclipOwners.Lethal = false
 				if humanoid and humanoid.Parent then humanoid.AutoRotate = true end
 				if clearVelocity and root and root.Parent then root.AssemblyLinearVelocity = Vector3.zero end
@@ -3506,21 +3505,20 @@ local function Main()
 			end
 			lethalCleanup = finishSession
 			connection = RunService.Heartbeat:Connect(function()
-				if not alive or sessionToken ~= lethalToken or not tech.enabled or not root.Parent or not target.Parent or character ~= LocalPlayer.Character then
+				if aborted() then
 					finishSession(false)
 					return
 				end
-				local elapsed = os.clock() - started
 				humanoid.AutoRotate = false
-				local angle = (elapsed / 0.45) * (math.pi / 1.5)
-				local fade = math.clamp(elapsed / 0.45, 0, 1)
-				local targetLook = target.Position + (side * math.cos(angle) + forward * math.sin(angle)) * (tech.accuracy * (1 - fade))
-				local lookCF = CFrame.lookAt(root.Position, Vector3.new(targetLook.X, root.Position.Y, targetLook.Z))
-				local _, yaw, _ = (root.CFrame:Inverse() * lookCF):ToEulerAnglesXYZ()
-				if angular and angular.Parent then angular.AngularVelocity = Vector3.new(0, yaw * 30, 0) end
+				local elapsed = os.clock() - started
+				if not flipped and elapsed >= tech.flipDelay then
+					root.CFrame = root.CFrame * CFrame.Angles(0, math.pi, 0)
+					flipped = true
+				end
 				local distanceXZ = (Vector2.new(root.Position.X, root.Position.Z) - Vector2.new(target.Position.X, target.Position.Z)).Magnitude
-				if (tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2) or elapsed > 1.5 or not tech.enabled then
-					finishSession(tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2)
+				local canCancel = tech.cancelEnabled and elapsed > tech.cancelDelay and distanceXZ < 2.2
+				if canCancel or elapsed > 1.5 then
+					finishSession(canCancel)
 				end
 			end)
 		end
@@ -3763,7 +3761,7 @@ local function Main()
 					if tech.kind == "lethal" then
 						addSlider(tech, "delay", "delay (s)", {0, 5, 0.01})
 						addSlider(tech, "jump", "Jump power", {0, 200, 1})
-						tech.accuracySlider = addSlider(tech, "accuracy", "accuracy", {-30, 30, 0.05})
+						addSlider(tech, "flipDelay", "Flip delay (s)", {0, 1, 0.01})
 						addSlider(tech, "cancelDelay", "Cancel delay (s)", {0, 3, 0.01})
 						addSlider(tech, "range", "Target range", {1, 50, 1})
 						tab:Toggle({Name = "Auto cancel", Default = tech.cancelEnabled, Callback = function(value)
