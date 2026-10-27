@@ -2965,7 +2965,7 @@ local function Main()
 		end
 		return object
 	end
-	local tabTech = addTab("Tech")
+	local tabTech = addTab("Combat")
 	local tabMisc = addTab("Misc")
 	local tabSettings = addTab("Settings")
 	local function buildTech(tab)
@@ -3814,6 +3814,140 @@ local function Main()
 				end,
 			})
 		end
+
+		-- =========================================
+		-- COMBAT: SLIDE M1 + NO DASH COOLDOWN
+		-- (dibungkus do...end supaya tidak menambah jumlah local di Main)
+		-- =========================================
+		do
+			local slideM1Enabled = false
+			local slideAnimConnection = nil
+			local slideCharConnection = nil
+
+			local slideTargetIDs = {
+				["10480796021"] = true,
+				["10480793962"] = true,
+			}
+
+			local function stopSlideAnim()
+				if slideAnimConnection then
+					slideAnimConnection:Disconnect()
+					slideAnimConnection = nil
+				end
+			end
+
+			local function stopSlideM1()
+				slideM1Enabled = false
+				stopSlideAnim()
+				if slideCharConnection then
+					slideCharConnection:Disconnect()
+					slideCharConnection = nil
+				end
+			end
+
+			local function setupSlideM1(character)
+				stopSlideAnim()
+
+				local humanoid = character:WaitForChild("Humanoid", 5)
+				local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
+				local remote = character:FindFirstChild("Communicate")
+
+				if not humanoid or not animator or not remote then
+					return
+				end
+
+				local lastTrigger = 0
+
+				slideAnimConnection = animator.AnimationPlayed:Connect(function(track)
+					if not slideM1Enabled then
+						return
+					end
+
+					local animation = track.Animation
+					local id = animation and animation.AnimationId:match("%d+")
+
+					if id and slideTargetIDs[id] and os.clock() - lastTrigger >= 1.5 then
+						lastTrigger = os.clock()
+
+						pcall(function()
+							remote:FireServer({
+								Mobile = true,
+								Goal = "LeftClick"
+							})
+
+							remote:FireServer({
+								Goal = "LeftClickRelease",
+								Mobile = true
+							})
+						end)
+					end
+				end)
+			end
+
+			local noDashCooldownEnabled = false
+			local previousDashCooldown = nil
+
+			local function setNoDashCooldown(state)
+				noDashCooldownEnabled = state
+
+				if state then
+					previousDashCooldown = workspace:GetAttribute("NoDashCooldown")
+					workspace:SetAttribute("NoDashCooldown", true)
+				else
+					workspace:SetAttribute("NoDashCooldown", previousDashCooldown)
+					previousDashCooldown = nil
+				end
+			end
+
+			-- Dipanggil saat "Destroy GUI": matikan fitur & kembalikan nilai asli
+			table.insert(connections, {
+				Disconnect = function()
+					pcall(stopSlideM1)
+					if noDashCooldownEnabled then
+						pcall(setNoDashCooldown, false)
+					end
+				end,
+			})
+
+			tab:Section("Local")
+
+			tab:Toggle({
+				Name = "Slide M1",
+				Default = false,
+				Callback = function(state)
+					if not state then
+						stopSlideM1()
+						return
+					end
+
+					slideM1Enabled = true
+
+					if LocalPlayer.Character then
+						setupSlideM1(LocalPlayer.Character)
+					end
+
+					if slideCharConnection then
+						slideCharConnection:Disconnect()
+					end
+
+					slideCharConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+						task.wait(1)
+
+						if slideM1Enabled then
+							setupSlideM1(character)
+						end
+					end)
+				end
+			})
+
+			tab:Toggle({
+				Name = "No Dash Cooldown",
+				Default = false,
+				Callback = function(state)
+					setNoDashCooldown(state)
+				end
+			})
+		end
 	end
 	buildTech(tabTech)
 
@@ -3872,16 +4006,32 @@ local function Main()
 			for key, assetId in pairs(visualSkyIds) do sky["Skybox" .. key] = "rbxassetid://" .. tostring(assetId) end
 			sky.SunAngularSize, sky.SunTextureId, sky.MoonAngularSize, sky.MoonTextureId = 0, "", 0, ""
 			for _, effect in ipairs(LightingService:GetChildren()) do
-				if effect:IsA("Atmosphere") then effect.Density, effect.Haze, effect.Glare = 0, 0, 0
-				elseif effect:IsA("PostEffect") or effect:IsA("SunRaysEffect") then effect.Enabled = false end
+				if effect:IsA("Atmosphere") then
+					if visualOldAtmosphere and not visualOldAtmosphere[effect] then visualOldAtmosphere[effect] = {Density = effect.Density, Haze = effect.Haze, Glare = effect.Glare} end
+					effect.Density, effect.Haze, effect.Glare = 0, 0, 0
+				elseif effect:IsA("PostEffect") or effect:IsA("SunRaysEffect") then
+					if visualOldEffects and visualOldEffects[effect] == nil then visualOldEffects[effect] = effect.Enabled end
+					effect.Enabled = false
+				end
 			end
 			if visualTerrain then
-				for _, cloud in ipairs(visualTerrain:GetChildren()) do if cloud:IsA("Clouds") then cloud.Enabled = false end end
+				for _, cloud in ipairs(visualTerrain:GetChildren()) do
+					if cloud:IsA("Clouds") then
+						if visualOldClouds and visualOldClouds[cloud] == nil then visualOldClouds[cloud] = cloud.Enabled end
+						cloud.Enabled = false
+					end
+				end
 			end
 			local function hookCharacter(character)
 				for _, object in ipairs(character:GetDescendants()) do
 					if object:IsA("Trail") or object:IsA("ParticleEmitter") then applyHeroHunterEffect(object) end
 				end
+				-- daftar karakter yang sudah di-hook disimpan di visualPackConnections.hooked
+				-- (otomatis terhapus saat Visual Pack dimatikan; tidak menambah local di Main)
+				local hooked = visualPackConnections.hooked
+				if not hooked then hooked = setmetatable({}, {__mode = "k"}); visualPackConnections.hooked = hooked end
+				if hooked[character] then return end
+				hooked[character] = true
 				visualSafeConnect(character.DescendantAdded, function(object)
 					if visualPackEnabled and (object:IsA("Trail") or object:IsA("ParticleEmitter")) then applyHeroHunterEffect(object) end
 				end)
@@ -3906,10 +4056,18 @@ local function Main()
 			visualOldClouds = {}
 			if visualTerrain then for _, cloud in ipairs(visualTerrain:GetChildren()) do if cloud:IsA("Clouds") then visualOldClouds[cloud] = cloud.Enabled end end end
 			applyVisualPack()
-			visualSafeConnect(LocalPlayer.CharacterAdded, function(character) task.wait(0.6); if visualPackEnabled then applyVisualPack() end end)
+			visualSafeConnect(LocalPlayer.CharacterAdded, function(character)
+				-- Mati / reset / respawn: pasang ulang langsung (detik 0), lalu ulangi di ~0.6s, ~1.5s, ~3s
+				-- supaya tidak kalah dengan game yang me-reset Lighting / efek sesudah karakter spawn.
+				for _, delay in ipairs({0, 0.6, 0.9, 1.5}) do
+					if delay > 0 then task.wait(delay) end
+					if not visualPackEnabled or LocalPlayer.Character ~= character then return end
+					applyVisualPack()
+				end
+			end)
 			visualSafeConnect(LightingService.ChildAdded, function(child)
 				if not visualPackEnabled then return end
-				if child:IsA("Sky") or child:IsA("Atmosphere") then task.defer(applyVisualPack) end
+				if child:IsA("Sky") or child:IsA("Atmosphere") or child:IsA("PostEffect") or child:IsA("SunRaysEffect") then task.defer(applyVisualPack) end
 			end)
 			if visualTerrain then visualSafeConnect(visualTerrain.ChildAdded, function(child) if visualPackEnabled and child:IsA("Clouds") then child.Enabled = false end end) end
 		else
